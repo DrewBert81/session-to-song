@@ -394,8 +394,8 @@ Need to keep validating the new flow and tightening edge cases.
                 "\n".join(
                     [
                         json.dumps({"type": "session", "id": "demo"}),
-                        json.dumps({"type": "message", "message": {"role": "user", "content": [{"type": "text", "text": "Built the automatic session source."}]}}),
-                        json.dumps({"type": "message", "message": {"role": "assistant", "content": [{"type": "text", "text": "Next step is wiring the preview and removing manual paste."}]}}),
+                        json.dumps({"type": "message", "message": {"role": "user", "content": [{"type": "text", "text": "Session-to-song built the automatic session source."}]}}),
+                        json.dumps({"type": "message", "message": {"role": "assistant", "content": [{"type": "text", "text": "Next session-to-song step is wiring the preview and removing manual paste."}]}}),
                     ]
                 ),
                 encoding="utf-8",
@@ -416,7 +416,7 @@ Need to keep validating the new flow and tightening edge cases.
                 assert source is not None
                 self.assertEqual(source.session_id, "demo")
                 material = extract_material_from_session(source)
-                self.assertIn("Built the automatic session source", material.raw_text)
+                self.assertIn("built the automatic session source", material.raw_text.lower())
                 self.assertTrue(material.wins)
 
     def test_alarm_auto_source_prefers_dated_memory_and_dreams(self) -> None:
@@ -494,6 +494,26 @@ Need to keep validating the new flow and tightening edge cases.
                     os.environ.pop("OPENCLAW_HOME", None)
                 else:
                     os.environ["OPENCLAW_HOME"] = old
+
+    def test_auto_source_project_label_does_not_grab_whole_session(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / ".openclaw"
+            sessions_dir = root / "agents" / "founders" / "sessions"
+            sessions_dir.mkdir(parents=True)
+            session_file = sessions_dir / "demo.jsonl"
+            rows = [
+                {"type": "message", "message": {"role": "user", "content": [{"type": "text", "text": "Session-to-song shipped the celebrate source filter."}]}},
+                {"type": "message", "message": {"role": "assistant", "content": [{"type": "text", "text": "OtherProject launched unrelated dashboard cleanup."}]}},
+                {"type": "message", "message": {"role": "assistant", "content": [{"type": "text", "text": "Next Session-to-song step is testing project-only celebration material."}]}},
+            ]
+            session_file.write_text("\n".join(json.dumps(row) for row in rows), encoding="utf-8")
+            (sessions_dir / "sessions.json").write_text(json.dumps({"demo": {"updatedAt": 9999999999999, "label": "session-to-song working room", "sessionFile": str(session_file)}}), encoding="utf-8")
+            with patch.dict(os.environ, {"OPENCLAW_HOME": str(root)}, clear=False):
+                source = resolve_best_session_source(SourceRequest(mode="auto", project="session-to-song", use="celebrate"))
+            self.assertIsNotNone(source)
+            assert source is not None
+            self.assertIn("session-to-song", source.raw_text.lower())
+            self.assertNotIn("otherproject", source.raw_text.lower())
 
     def test_session_fetch_filters_lines_by_project(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

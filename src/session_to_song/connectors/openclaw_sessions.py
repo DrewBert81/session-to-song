@@ -651,10 +651,9 @@ def resolve_best_session_source(request: SourceRequest) -> ResolvedSource | None
         candidates = [candidate for candidate in candidates if candidate["session_key"] == request.session_key] or candidates
     scored: list[tuple[float, str, dict, str]] = []
     for candidate in candidates:
-        label_matches_project = bool(request.project and project_matches(str(candidate.get("label") or ""), request.project))
         transcript = fetch_session_text(
             candidate["session_key"],
-            project=None if label_matches_project else request.project,
+            project=request.project,
         )
         if not transcript.strip():
             continue
