@@ -228,7 +228,7 @@ On another machine, `session-to-song` reads that user's own local OpenClaw sessi
 ~/.openclaw/agents/*/sessions/sessions.json
 ```
 
-Those registry files point to that user's local session JSONL transcripts. Nothing from this repo ships with Drew's sessions, keys, outputs, or memory. If OpenClaw has recent sessions, `--source auto` and the web UI's one-click flow pick high-signal recent work. If the user adds a project filter, the resolver biases toward sessions and lines matching that project and filters out unrelated session noise.
+Those registry files point to that user's local session JSONL transcripts. If OpenClaw has recent sessions, `--source auto` and the web UI's one-click flow pick high-signal recent work. If the user adds a project filter, the resolver biases toward sessions and lines matching that project and filters out unrelated session noise.
 
 Expected public behavior:
 - **Curated OpenClaw context exists:** auto mode prefers local wiki, memory, and archived session digests because they are cleaner than raw transcripts.
