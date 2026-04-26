@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "session-to-song"
+version = "0.2.1"
+description = "Turn OpenClaw, Hermes, or text sessions into pulses, lyrics, music prompts, and song-ready artifacts"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "Session-to-song contributors" }
+]
+keywords = ["music", "cli", "lyrics", "session", "openclaw", "prompt-engineering"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+
+[project.scripts]
+session-to-song = "session_to_song.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["session_to_song*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

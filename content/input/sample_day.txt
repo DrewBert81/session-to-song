@@ -1,0 +1,6 @@
+Built the first pass of a daily summary-to-song workflow for a small product team.
+Drafted the repo structure and wrote a text pipeline that turns a raw worklog into a short pulse.
+Tested a wake-up song concept with a short hip hop / alarm lyric format.
+Blocked on deciding whether the final delivery should feel more reflective or more high-energy.
+Need to add a wrapper so the project can hand prompts to music generation later without breaking the text-only demo.
+Next step is to show one clean example so a new user can react to something concrete fast.

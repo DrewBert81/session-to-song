@@ -1,0 +1,19 @@
+[Alarm Track | style=boom_bap_alarm | ~45s]
+
+[Intro]
+Alarm on, screen glow, status check, let's go
+
+[Verse]
+Built the first pass of a daily summary-to-song workflow.
+Blocked on deciding whether the final delivery should feel more reflective or ...
+Need to add a wrapper so the project can hand prompts to ...
+Small team rhythm, big day energy, no drift
+
+[Hook]
+Wake up, stack wins, turn the signal into momentum | pulse, short, daily
+
+[Reference Pulse]
+- Win: Built the first pass of a daily summary-to-song workflow ...
+- Watch: Blocked on deciding whether the final delivery should feel more ...
+- Next: Need to add a wrapper so the project can hand ...
+- Signal: pulse, short, daily, workflow, built, summary

@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>session-to-song UI mockup</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: rgba(15, 23, 42, 0.86);
+      --panel-2: rgba(22, 31, 58, 0.92);
+      --line: rgba(148, 163, 184, 0.18);
+      --text: #e8eefc;
+      --muted: #9fb0d3;
+      --accent: #8b5cf6;
+      --accent-2: #22c55e;
+      --accent-3: #38bdf8;
+      --warn: #f59e0b;
+      --shadow: 0 24px 80px rgba(0,0,0,.45);
+      --radius: 22px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(56,189,248,.15), transparent 28%),
+        radial-gradient(circle at top right, rgba(139,92,246,.20), transparent 30%),
+        linear-gradient(180deg, #0a0f1d 0%, #0b1020 42%, #080c17 100%);
+      min-height: 100vh;
+    }
+    .shell {
+      width: 1440px;
+      max-width: calc(100vw - 40px);
+      margin: 24px auto;
+      display: grid;
+      grid-template-columns: 280px 1fr 380px;
+      gap: 18px;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+    .sidebar { padding: 20px 18px; }
+    .brand {
+      padding: 10px 10px 18px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 18px;
+    }
+    .brand h1 { font-size: 20px; margin: 0; letter-spacing: -.03em; }
+    .brand p { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+    .nav-group { margin-bottom: 20px; }
+    .nav-label {
+      color: #7f91bb; text-transform: uppercase; letter-spacing: .12em; font-size: 11px; margin: 0 0 10px 10px;
+    }
+    .nav-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 14px; border-radius: 16px; margin-bottom: 8px;
+      color: var(--text); border: 1px solid transparent; background: transparent;
+    }
+    .nav-item.active { background: rgba(139,92,246,.16); border-color: rgba(139,92,246,.28); }
+    .nav-item small { color: var(--muted); }
+    .main { padding: 22px; }
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;
+    }
+    .hero h2 { margin: 0; font-size: 30px; letter-spacing: -.04em; }
+    .hero p { margin: 8px 0 0; color: var(--muted); max-width: 760px; line-height: 1.45; }
+    .actions { display: flex; gap: 10px; }
+    .btn {
+      border: 1px solid var(--line); background: rgba(255,255,255,.03); color: var(--text);
+      border-radius: 14px; padding: 12px 16px; font-weight: 600; font-size: 13px;
+    }
+    .btn.primary { background: linear-gradient(135deg, var(--accent), #6d28d9); border-color: transparent; }
+    .btn.success { background: linear-gradient(135deg, #16a34a, #22c55e); border-color: transparent; }
+    .grid {
+      display: grid; grid-template-columns: 1.2fr .8fr; gap: 18px;
+    }
+    .stack { display: grid; gap: 18px; }
+    .card { padding: 18px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 20px; }
+    .card h3 { margin: 0 0 6px; font-size: 17px; }
+    .card p.sub { margin: 0 0 16px; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .segmented, .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+    .seg {
+      padding: 11px 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13px;
+      background: rgba(255,255,255,.02);
+    }
+    .seg.active { color: white; background: rgba(56,189,248,.16); border-color: rgba(56,189,248,.34); }
+    .chip {
+      padding: 12px 14px; border-radius: 16px; min-width: 160px;
+      border: 1px solid var(--line); background: rgba(255,255,255,.025);
+    }
+    .chip.active-purple { background: rgba(139,92,246,.14); border-color: rgba(139,92,246,.34); }
+    .chip.active-green { background: rgba(34,197,94,.14); border-color: rgba(34,197,94,.34); }
+    .chip strong { display: block; font-size: 13px; margin-bottom: 4px; }
+    .chip span { color: var(--muted); font-size: 12px; line-height: 1.35; }
+    .source-box {
+      border: 1px dashed rgba(148,163,184,.35); border-radius: 20px; padding: 16px; background: rgba(255,255,255,.025);
+    }
+    .source-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+    .tab {
+      padding: 8px 12px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 12px;
+    }
+    .tab.active { color: white; background: rgba(34,197,94,.14); border-color: rgba(34,197,94,.34); }
+    .textarea {
+      height: 208px; border-radius: 18px; border: 1px solid var(--line); padding: 16px; color: #dfe7fa;
+      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+      font-size: 14px; line-height: 1.55; white-space: pre-wrap;
+    }
+    .quick-prompts { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .prompt { padding: 8px 10px; border-radius: 999px; background: rgba(255,255,255,.04); color: var(--muted); font-size: 12px; border: 1px solid var(--line); }
+    .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .mini {
+      padding: 14px; border-radius: 18px; background: rgba(255,255,255,.03); border: 1px solid var(--line);
+    }
+    .mini label { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+    .mini .value { font-size: 14px; font-weight: 700; }
+    .duration-bar {
+      margin-top: 8px; height: 10px; border-radius: 999px; background: rgba(255,255,255,.07); position: relative;
+    }
+    .duration-fill {
+      position: absolute; left: 0; top: 0; bottom: 0; width: 32%; border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent-3), var(--accent));
+    }
+    .right { padding: 18px; }
+    .preview-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .status { font-size: 12px; color: #9cf0b7; background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.28); padding: 6px 10px; border-radius: 999px; }
+    .artifact {
+      border: 1px solid var(--line); background: rgba(255,255,255,.03); border-radius: 18px; padding: 14px; margin-bottom: 12px;
+    }
+    .artifact h4 { margin: 0 0 8px; font-size: 13px; color: #c9d7f7; }
+    .artifact pre {
+      margin: 0; white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px; line-height: 1.5; color: #dbe7ff;
+    }
+    .footer-note {
+      margin-top: 10px; color: var(--muted); font-size: 12px; line-height: 1.45;
+      padding: 12px; border-radius: 14px; background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.18);
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="panel sidebar">
+      <div class="brand">
+        <h1>session-to-song</h1>
+        <p>Work you can hear again. Built for alarms, build recaps, memory playback, and lock-in speeches.</p>
+      </div>
+
+      <div class="nav-group">
+        <p class="nav-label">Create</p>
+        <div class="nav-item active"><span>New artifact</span><small>Live</small></div>
+        <div class="nav-item"><span>Saved runs</span><small>18</small></div>
+        <div class="nav-item"><span>Templates</span><small>7</small></div>
+      </div>
+
+      <div class="nav-group">
+        <p class="nav-label">Modes</p>
+        <div class="nav-item"><span>Alarm</span><small>Wake-up</small></div>
+        <div class="nav-item active"><span>Build</span><small>What did I build?</small></div>
+        <div class="nav-item"><span>Memory</span><small>Recall</small></div>
+        <div class="nav-item"><span>Speech</span><small>Lock me in</small></div>
+      </div>
+
+      <div class="nav-group">
+        <p class="nav-label">Connections</p>
+        <div class="nav-item"><span>Text / Paste</span><small>Ready</small></div>
+        <div class="nav-item"><span>Claude Code</span><small>Soon</small></div>
+        <div class="nav-item"><span>Perplexity</span><small>Soon</small></div>
+      </div>
+    </aside>
+
+    <main class="panel main">
+      <div class="topbar">
+        <div class="hero">
+          <h2>Build a replayable artifact from real work</h2>
+          <p>This UI is optimized for one thing: take recent work, choose the feeling, choose the format, choose the length, then generate something you'd actually want to replay.</p>
+        </div>
+        <div class="actions">
+          <button class="btn">Save preset</button>
+          <button class="btn primary">Generate artifact</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="stack">
+          <section class="card">
+            <h3>1. Pick the outcome</h3>
+            <p class="sub">Make the intent obvious first. The whole UI pivots around what the user actually wants to feel afterward.</p>
+            <div class="segmented">
+              <div class="seg">Alarm</div>
+              <div class="seg active">Build recap</div>
+              <div class="seg">Memory recall</div>
+              <div class="seg">Motivational speech</div>
+              <div class="seg">Milestone anthem</div>
+            </div>
+          </section>
+
+          <section class="card">
+            <h3>2. Bring in the source</h3>
+            <p class="sub">No generic “upload your data” sludge. The default is paste, with connectors living right beside it.</p>
+            <div class="source-box">
+              <div class="source-tabs">
+                <div class="tab active">Paste session</div>
+                <div class="tab">Open transcript</div>
+                <div class="tab">Claude connector</div>
+                <div class="tab">Perplexity connector</div>
+              </div>
+              <div class="textarea">Built the setup flow for session-to-song.
+Added init, config show, style set, test, and generate.
+Added a new build mode for “what did I just build?”.
+Cleaned the repo for safe public release.
+Need to make the final UX feel more product-grade than dev-grade.
+Next step is speech mode and connectors.</div>
+              <div class="quick-prompts">
+                <div class="prompt">what did I just build?</div>
+                <div class="prompt">turn this into a lock-in speech</div>
+                <div class="prompt">make this a 45 second alarm</div>
+                <div class="prompt">give me the build anthem</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="card">
+            <h3>3. Choose the feel</h3>
+            <p class="sub">This is where the product gets interesting. Not celebrity clones — clean archetypes with real emotional intent.</p>
+            <div class="chips">
+              <div class="chip active-purple"><strong>Build Reflection</strong><span>Triumphant, reflective, replayable. Good for “what did I just build?”.</span></div>
+              <div class="chip"><strong>Relentless Discipline</strong><span>Short lines, hard edge, command energy, zero drift.</span></div>
+              <div class="chip active-green"><strong>Founder Lock-In</strong><span>Conviction, urgency, standards, mission-first.</span></div>
+              <div class="chip"><strong>Calm Conviction</strong><span>Grounded, confident, steady pressure, less aggression.</span></div>
+              <div class="chip"><strong>Compassionate Rebuild</strong><span>Encouraging, identity-repair, hopeful, warm.</span></div>
+            </div>
+          </section>
+
+          <section class="card">
+            <h3>4. Set the format</h3>
+            <p class="sub">These controls should be blunt and useful. No mystery knobs.</p>
+            <div class="row">
+              <div class="mini">
+                <label>Artifact type</label>
+                <div class="value">Music-backed speech</div>
+              </div>
+              <div class="mini">
+                <label>Length</label>
+                <div class="value">45 seconds</div>
+                <div class="duration-bar"><div class="duration-fill"></div></div>
+              </div>
+              <div class="mini">
+                <label>Output</label>
+                <div class="value">Text + audio prompt</div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="panel right">
+          <div class="preview-title">
+            <div>
+              <h3 style="margin:0">Live preview</h3>
+              <p class="sub" style="margin:6px 0 0">The right side should make the result feel real before generation.</p>
+            </div>
+            <div class="status">ready</div>
+          </div>
+
+          <div class="artifact">
+            <h4>Pulse</h4>
+            <pre>- Built: Added real onboarding to session-to-song ...
+- Unlocked: Users can now configure styles and duration ...
+- Hard part: Turning the engine into a product ...
+- Next because of this: Add speech mode and connectors ...</pre>
+          </div>
+
+          <div class="artifact">
+            <h4>Speech opening</h4>
+            <pre>Look at where this is right now.
+It is no longer an idea.
+It has shape.
+It has controls.
+It has momentum.
+Now stop hovering over it and finish the next layer.</pre>
+          </div>
+
+          <div class="artifact">
+            <h4>Music / voice direction</h4>
+            <pre>45-second founder lock-in speech with restrained cinematic pulse,
+then lift into confident drums and wide synths.
+Direct address. Command energy. No fluff.
+Do not produce a full-length track.</pre>
+          </div>
+
+          <div class="footer-note">
+            Perfect UI principle: users should be able to answer three things instantly — <strong>what am I making</strong>, <strong>what energy should it have</strong>, and <strong>how long should it be</strong>.
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <aside class="panel right">
+      <div class="preview-title">
+        <div>
+          <h3 style="margin:0">Sticky setup</h3>
+          <p class="sub" style="margin:6px 0 0">Set once, then mostly forget it.</p>
+        </div>
+      </div>
+
+      <div class="artifact">
+        <h4>Default behavior</h4>
+        <pre>Default mode: Build
+Default style: Founder Lock-In
+Default duration: 45 seconds
+Default delivery: Save + optional audio</pre>
+      </div>
+
+      <div class="artifact">
+        <h4>Triggers</h4>
+        <pre>Morning alarm at 6:45 AM
+Prompt: “what did I just build?”
+Prompt: “lock me in”
+Prompt: “turn this into a speech”</pre>
+      </div>
+
+      <div class="artifact">
+        <h4>Connector plan</h4>
+        <pre>• Paste text works now
+• Claude Code session capture next
+• Perplexity connector after that
+• No forced uploads when a live source exists</pre>
+      </div>
+
+      <div class="artifact">
+        <h4>Why this UI works</h4>
+        <pre>It doesn't pretend to be a chat app.
+It doesn't bury the useful controls.
+It treats mode, style, and duration as first-class.
+It previews the emotional result, not just settings.</pre>
+      </div>
+    </aside>
+  </div>
+</body>
+</html>

@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="Turn your work sessions into replayable songs — alarm tracks, reminders, celebration anthems, and next-step bangers.">
+  <title>session-to-song · Make work replayable</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+  <!-- Ambient background effects -->
+  <div class="bg-glow bg-glow--purple" aria-hidden="true"></div>
+  <div class="bg-glow bg-glow--blue" aria-hidden="true"></div>
+  <div class="bg-glow bg-glow--teal" aria-hidden="true"></div>
+
+  <div id="app" class="app">
+
+    <!-- ─── HERO HEADER ──────────────────────────── -->
+    <header class="hero-header">
+      <div class="hero-header__brand">
+        <div class="hero-header__icon" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <circle cx="14" cy="14" r="13" stroke="url(#brandGrad)" stroke-width="2"/>
+            <path d="M11 8v12l8-6-8-6z" fill="url(#brandGrad)"/>
+            <defs><linearGradient id="brandGrad" x1="0" y1="0" x2="28" y2="28"><stop stop-color="#a78bfa"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
+          </svg>
+        </div>
+        <span class="hero-header__name">session-to-song</span>
+      </div>
+      <div class="hero-header__status">
+        <span id="providerBadge" class="provider-badge">Checking…</span>
+      </div>
+    </header>
+
+    <!-- ─── ONE-CLICK HERO ───────────────────────── -->
+    <section class="hero-card" id="heroCard">
+      <div class="hero-card__content">
+        <p class="hero-card__eyebrow">One-click flow</p>
+        <h1 class="hero-card__title">Make my last session<br>into a song.</h1>
+        <p class="hero-card__subtitle">Auto-sources your most recent OpenClaw session, picks the best material, and generates a replayable track in seconds.</p>
+        <div class="hero-card__actions">
+          <button id="heroGenerateBtn" class="btn btn--hero" type="button">
+            <span class="btn__icon" aria-hidden="true">▶</span>
+            <span class="btn__label">Make it a song</span>
+          </button>
+          <button id="heroCustomizeBtn" class="btn btn--ghost" type="button">
+            Customize first
+          </button>
+        </div>
+      </div>
+      <div class="hero-card__viz" aria-hidden="true">
+        <canvas id="heroCanvas" width="240" height="120"></canvas>
+      </div>
+    </section>
+
+    <!-- ─── MAIN LAYOUT ──────────────────────────── -->
+    <div class="main-layout" id="mainLayout">
+
+      <!-- ──── LEFT: CONTROLS ────────────────── -->
+      <div class="controls-pane">
+
+        <!-- USE -->
+        <div class="ctrl-section" id="useSection">
+          <div class="ctrl-section__header">
+            <span class="ctrl-section__step">1</span>
+            <h2 class="ctrl-section__title">What's it for?</h2>
+          </div>
+          <div id="useList" class="use-grid"></div>
+        </div>
+
+        <!-- SHAPE -->
+        <div class="ctrl-section" id="shapeSection">
+          <div class="ctrl-section__header">
+            <span class="ctrl-section__step">2</span>
+            <h2 class="ctrl-section__title">Shape it</h2>
+          </div>
+
+          <label class="field-label">Genre</label>
+          <div id="genreList" class="genre-grid"></div>
+
+          <div class="field-group" style="margin-top: 1rem;">
+            <label class="field-label" for="projectInput">Project filter <span class="field-hint">(optional)</span></label>
+            <input id="projectInput" class="text-input" placeholder="e.g. ExampleProject, ClientPortal, session-to-song...">
+          </div>
+
+          <div class="field-group" style="margin-top: 1rem;">
+            <label class="field-label" for="artistInput">Sound reference <span class="field-hint">(optional)</span></label>
+            <input id="artistInput" class="text-input" placeholder="e.g. 90s boom bap, cinematic synths, arena rock...">
+          </div>
+
+          <div class="shape-row">
+            <div class="field-group">
+              <label class="field-label">Length</label>
+              <div id="durationList" class="duration-row"></div>
+            </div>
+            <div class="field-group" style="margin-left: 1rem;">
+              <label class="field-label" for="llmSelect">Text Writer</label>
+              <select id="llmSelect" class="text-input" style="cursor: pointer;"></select>
+            </div>
+            <div class="field-group" style="margin-left: 1rem;">
+              <label class="field-label" for="modelSelect">Audio Studio</label>
+              <select id="modelSelect" class="text-input" style="cursor: pointer;"></select>
+            </div>
+          </div>
+        </div>
+
+        <!-- GENERATE -->
+        <div class="ctrl-section generate-section">
+          <div class="action-bar">
+            <button id="generateBtn" class="btn btn--primary btn--full" type="button">
+              <span class="btn__label">Generate draft</span>
+              <span class="btn__spinner" aria-hidden="true"></span>
+            </button>
+            <button id="generateAudioBtn" class="btn btn--secondary btn--full" type="button" disabled>
+              <span class="btn__label">Generate audio</span>
+              <span class="btn__spinner" aria-hidden="true"></span>
+            </button>
+          </div>
+          <div class="status-bar" id="statusBox">Ready.</div>
+        </div>
+      </div>
+
+      <!-- ──── RIGHT: PREVIEW ────────────────── -->
+      <aside class="preview-pane" id="previewPane">
+        <div class="preview-pane__header">
+          <div>
+            <p class="preview-pane__eyebrow">Preview</p>
+            <h2 class="preview-pane__title">Your track</h2>
+          </div>
+          <span id="durationBadge" class="duration-badge">45s</span>
+        </div>
+
+        <div class="preview-pane__config" id="setupPreview">
+          <div class="config-row"><span class="config-key">Use</span><span class="config-val" id="cfgUse">Celebrate</span></div>
+          <div class="config-row"><span class="config-key">Genre</span><span class="config-val" id="cfgGenre">Rap</span></div>
+          <div class="config-row"><span class="config-key">Project</span><span class="config-val" id="cfgProject">Any recent work</span></div>
+        </div>
+
+        <!-- Audio Player -->
+        <div class="audio-card" id="audioCard">
+          <div class="audio-card__viz" aria-hidden="true">
+            <canvas id="audioCanvas" width="400" height="60"></canvas>
+          </div>
+          <audio id="audioPlayer" controls preload="none"></audio>
+          <p class="audio-card__meta" id="audioMeta">Generate a draft, then create audio.</p>
+        </div>
+
+        <!-- Artifact panels -->
+        <div class="artifact-panel" id="pulsePanel">
+          <div class="artifact-panel__header">
+            <h3>Pulse</h3>
+            <button class="copy-btn" data-target="pulsePreview" title="Copy pulse">⎘</button>
+          </div>
+          <pre id="pulsePreview" class="artifact-panel__body">Generate to preview the pulse.</pre>
+        </div>
+
+        <div class="artifact-panel" id="lyricsPanel">
+          <div class="artifact-panel__header">
+            <h3>Draft</h3>
+            <button class="copy-btn" data-target="lyricsPreview" title="Copy draft">⎘</button>
+          </div>
+          <pre id="lyricsPreview" class="artifact-panel__body">Generate to preview the lyrical or spoken artifact.</pre>
+        </div>
+
+        <div class="artifact-panel" id="musicPanel">
+          <div class="artifact-panel__header">
+            <h3>Sound direction</h3>
+            <button class="copy-btn" data-target="musicPreview" title="Copy prompt">⎘</button>
+          </div>
+          <pre id="musicPreview" class="artifact-panel__body">Generate to preview the direction prompt.</pre>
+        </div>
+
+        <div class="artifact-panel artifact-panel--compact">
+          <div class="artifact-panel__header">
+            <h3>Saved output</h3>
+          </div>
+          <div id="fileLinks" class="file-links">No local files yet.</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

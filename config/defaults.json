@@ -1,0 +1,31 @@
+{
+  "providers": {
+    "llm": {
+      "provider": "auto",
+      "model": ""
+    },
+    "music": {
+      "provider": "auto",
+      "model": ""
+    }
+  },
+  "defaults": {
+    "use": "alarm",
+    "genre": "rap",
+    "delivery": "save",
+    "duration_seconds": 45,
+    "quiet_hours": {
+      "start": "22:00",
+      "end": "06:30"
+    }
+  },
+  "preferences": {
+    "genre_by_use": {
+      "alarm": "rap",
+      "reminder": "rock",
+      "celebrate": "rap",
+      "next_steps": "heavy_metal"
+    },
+    "genre_by_project": {}
+  }
+}
