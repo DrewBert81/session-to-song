@@ -47,6 +47,8 @@ def default_alarm_slot_dirs() -> list[Path]:
         userprofile / "Google Drive" / "My Drive" / "sessiontosong" / "alarms",
         userprofile / "Google Drive" / "sessiontosong" / "alarms",
         userprofile / "Drive" / "sessiontosong" / "alarms",
+        userprofile / "iCloudDrive" / "sessiontosong" / "alarms",
+        userprofile / "iCloud Drive" / "sessiontosong" / "alarms",
     ])
     for letter in "DEFGHIJKLMNOPQRSTUVWXYZ":
         dirs.append(Path(f"{letter}:\\My Drive\\sessiontosong\\alarms"))
@@ -59,6 +61,24 @@ def default_alarm_slot_dirs() -> list[Path]:
         seen.add(key)
         unique.append(directory)
     return unique
+
+
+def alarm_slot_suggestions() -> list[dict[str, object]]:
+    suggestions: list[dict[str, object]] = []
+    for directory in default_alarm_slot_dirs():
+        lowered = str(directory).lower()
+        if "icloud" in lowered:
+            label = "iCloud Drive"
+        elif "google drive" in lowered or "my drive" in lowered:
+            label = "Google Drive"
+        else:
+            label = "Sync folder"
+        suggestions.append({
+            "label": label,
+            "path": str(directory),
+            "exists": directory.exists() and directory.is_dir(),
+        })
+    return suggestions
 
 
 def resolve_alarm_slot_dir(target_dir: str | Path | None = None, *, create: bool = True) -> Path:

@@ -68,6 +68,10 @@ const els = {
   publishMorningBtn: $('publishMorningBtn'),
   downloadAudioLink: $('downloadAudioLink'),
   alarmSlotDirInput: $('alarmSlotDirInput'),
+  pickAlarmFolderBtn: $('pickAlarmFolderBtn'),
+  googleDriveDefaultBtn: $('googleDriveDefaultBtn'),
+  icloudDefaultBtn: $('icloudDefaultBtn'),
+  alarmSlotHint:     $('alarmSlotHint'),
   audioMeta:         $('audioMeta'),
   audioCanvas:       $('audioCanvas'),
   heroCanvas:        $('heroCanvas'),
@@ -362,6 +366,55 @@ function syncFocusToUse() {
   state.focus = FOCUS_FOR_USE[state.use] || '';
 }
 
+async function loadAlarmSlotSuggestions() {
+  try {
+    const res = await fetch('/api/alarm-slot/suggestions');
+    const data = await res.json();
+    state.alarmSlotSuggestions = data.suggestions || [];
+    const existing = state.alarmSlotSuggestions.find(s => s.exists);
+    if (!els.alarmSlotDirInput.value && existing) {
+      els.alarmSlotDirInput.value = existing.path;
+      localStorage.setItem('s2sAlarmSlotDir', existing.path);
+      els.alarmSlotHint.textContent = `Found ${existing.label}: ${existing.path}`;
+    }
+  } catch (e) {}
+}
+
+function setAlarmSlotDir(path, label = 'Alarm folder') {
+  if (!path) return;
+  els.alarmSlotDirInput.value = path;
+  localStorage.setItem('s2sAlarmSlotDir', path);
+  els.alarmSlotHint.textContent = `${label}: ${path}`;
+}
+
+function useSuggestedAlarmDir(kind) {
+  const suggestions = state.alarmSlotSuggestions || [];
+  const match = suggestions.find(s => s.label.toLowerCase().includes(kind) && s.exists)
+    || suggestions.find(s => s.label.toLowerCase().includes(kind))
+    || null;
+  if (match) {
+    setAlarmSlotDir(match.path, match.exists ? `Found ${match.label}` : `${match.label} suggestion`);
+    return;
+  }
+  const homeHint = kind === 'icloud'
+    ? 'Paste your local iCloud Drive\\sessiontosong\\alarms folder path.'
+    : 'Paste your local My Drive\\sessiontosong\\alarms folder path.';
+  els.alarmSlotHint.textContent = homeHint;
+}
+
+async function pickAlarmFolder() {
+  if (!window.showDirectoryPicker) {
+    els.alarmSlotHint.textContent = 'This browser cannot expose folder paths. Use Google Drive/iCloud suggestion or paste the local sync folder path.';
+    return;
+  }
+  try {
+    await window.showDirectoryPicker({ mode: 'readwrite' });
+    els.alarmSlotHint.textContent = 'Folder picked, but browsers hide the real filesystem path. Paste the local sync folder path so the server can write S2S-morning.mp3.';
+  } catch (e) {
+    els.alarmSlotHint.textContent = 'Folder selection cancelled.';
+  }
+}
+
 async function publishMorningAlarm() {
   const targetDir = (els.alarmSlotDirInput?.value || '').trim();
   if (targetDir) localStorage.setItem('s2sAlarmSlotDir', targetDir);
@@ -550,6 +603,9 @@ els.generateBtn.addEventListener('click', generate);
 els.generateAudioBtn.addEventListener('click', generateAudio);
 els.playLocalBtn.addEventListener('click', playLocalAudio);
 els.publishMorningBtn.addEventListener('click', publishMorningAlarm);
+els.pickAlarmFolderBtn.addEventListener('click', pickAlarmFolder);
+els.googleDriveDefaultBtn.addEventListener('click', () => useSuggestedAlarmDir('google'));
+els.icloudDefaultBtn.addEventListener('click', () => useSuggestedAlarmDir('icloud'));
 els.modelSelect.addEventListener('change', () => {});
 els.projectInput.addEventListener('input', () => {
   state.lastMusicPrompt = null;
@@ -574,4 +630,5 @@ if (els.alarmSlotDirInput) {
   els.alarmSlotDirInput.value = localStorage.getItem('s2sAlarmSlotDir') || '';
   els.alarmSlotDirInput.addEventListener('input', () => localStorage.setItem('s2sAlarmSlotDir', els.alarmSlotDirInput.value.trim()));
 }
+loadAlarmSlotSuggestions();
 bootstrap();

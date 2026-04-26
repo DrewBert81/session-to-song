@@ -10,7 +10,7 @@ from urllib.parse import parse_qs
 from wsgiref.simple_server import make_server
 
 from .adapters.common import material_from_text
-from .alarm_slots import AlarmSlotError, publish_alarm_slot
+from .alarm_slots import AlarmSlotError, alarm_slot_suggestions, publish_alarm_slot
 from .connectors.openclaw_sessions import SourceRequest, resolve_best_session_source
 from .config_loader import load_user_config, resolve_run_request
 from .domain import RunRequest
@@ -493,6 +493,9 @@ def app(environ, start_response):
 
     if path == "/api/sources/resolve" and method == "GET":
         return _handle_resolve_source(start_response, parse_qs(environ.get("QUERY_STRING", "")))
+
+    if path == "/api/alarm-slot/suggestions" and method == "GET":
+        return _json(start_response, {"suggestions": alarm_slot_suggestions()})
 
     if path == "/api/generate-audio" and method == "POST":
         try:
