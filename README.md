@@ -11,6 +11,14 @@ This is a **repo**, not just a skill.
 It is built around a simple product idea:
 **work you can hear again.**
 
+## Listen first
+
+Sample celebration track from a real session-to-song run:
+
+- [`session-to-song-commit.mp3`](content/examples/audio/session-to-song-commit.mp3)
+
+This is the concrete loop: ship work, turn the session into lyrics/music prompt/audio, then hear the milestone back as a short celebration.
+
 ## What it does now
 
 - supports input adapters for:
