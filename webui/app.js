@@ -16,7 +16,13 @@ const GENRE_DESC = {
   folk:         'Human, reflective',
 };
 
-const GENRE_FOR_USE = { alarm: 'rap', reminder: 'rock', celebrate: 'rap' };
+const GENRE_FOR_USE = { alarm: 'rap', reminder: 'rock', celebrate: 'rap', next_steps: 'heavy_metal' };
+const FOCUS_FOR_USE = {
+  alarm: 'wake me back into the mission: yesterday, today, and why it matters',
+  reminder: 'state check: where the project stands, what is unresolved, and what to remember',
+  celebrate: 'payoff: what landed, what changed, and the win worth replaying',
+  next_steps: 'next move: the concrete action to take now and why it matters',
+};
 
 /* ─── STATE ─────────────────────────────────── */
 const state = {
@@ -71,7 +77,7 @@ async function bootstrap() {
     Object.assign(state, {
       use:              data.defaults.use || 'celebrate',
       genre:            data.defaults.genre || 'rap',
-      focus:            data.defaults.focus || 'what shipped and why it matters',
+      focus:            FOCUS_FOR_USE[data.defaults.use || 'celebrate'] || data.defaults.focus || '',
       duration_seconds: data.defaults.duration_seconds || 45,
       music_model:      data.defaults.music_model || '',
       audioAvailable:   Boolean(data.audio_generation?.available),
@@ -177,6 +183,7 @@ function renderUses() {
     card.onclick = () => {
       state.use = use;
       state.genre = GENRE_FOR_USE[use] || 'rap';
+      syncFocusToUse();
       renderUses();
       renderGenres();
       updateConfig();
@@ -345,9 +352,7 @@ async function generateAudio() {
 
 /* ─── ONE-CLICK HERO FLOW ───────────────────── */
 function syncFocusToUse() {
-  state.focus = state.use === 'reminder'
-    ? 'where the project stands and what is next'
-    : (state.use === 'alarm' ? 'what matters today' : 'what shipped and why it matters');
+  state.focus = FOCUS_FOR_USE[state.use] || '';
 }
 
 async function resolveSource() {

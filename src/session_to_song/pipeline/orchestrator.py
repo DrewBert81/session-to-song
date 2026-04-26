@@ -45,24 +45,28 @@ HUMAN_REWRITES = {
 
 USE_HELPERS = {
     "alarm": {
-        "pulse_label": "Momentum",
-        "bridge": "Remember what you built. Feel where the mission is pointing next.",
-        "music": "Make it feel like waking back into the mission: what happened yesterday, what matters now, and where today is headed.",
+        "pulse_label": "Re-entry",
+        "bridge": "Wake back into the thread: yesterday is context, today is the mission.",
+        "music": "Make it feel like mission re-entry after sleep: orient the listener, name what changed, then point at today's first move. Not a victory lap.",
+        "fallback_intro": "Eyes open, thread intact, yesterday hands today the map",
     },
     "reminder": {
-        "pulse_label": "Direction",
-        "bridge": "State, change, direction, and tension all stay clear.",
-        "music": "Favor clarity about project state and direction over victory framing.",
+        "pulse_label": "State check",
+        "bridge": "Hold the map steady: state, tension, decision, and next reminder.",
+        "music": "Make it feel like a crisp project status reminder: less hype, more clarity, unresolved tension, and what must not be forgotten.",
+        "fallback_intro": "Status light on, keep the thread from slipping",
     },
     "celebrate": {
-        "pulse_label": "Payoff",
-        "bridge": "Name what shipped, what changed, and why it matters.",
-        "music": "Make it feel like a payoff for real completed work, not abstract hype.",
+        "pulse_label": "Win replay",
+        "bridge": "Turn completed work into a replayable win without losing the specifics.",
+        "music": "Make it feel like payoff for real completed work: what landed, what changed, and why the win is worth replaying.",
+        "fallback_intro": "Win on the board, turn the proof up loud",
     },
     "next_steps": {
-        "pulse_label": "Next move",
-        "bridge": "Where we are now points straight at the next concrete move.",
-        "music": "Create urgency around the next action and make the move feel obvious.",
+        "pulse_label": "Move now",
+        "bridge": "Cut through the recap: one clear next move, one reason to act.",
+        "music": "Create urgency around the next concrete action. The track should feel like a launch command, not a recap.",
+        "fallback_intro": "No more circling, name the move and hit it",
     },
 }
 
@@ -133,40 +137,40 @@ def summarize_material(material: SessionMaterial, use: str = "alarm", focus: str
     helper = USE_HELPERS.get(use, USE_HELPERS["alarm"])
     lines: list[str] = []
     focus_line = _focus_line(focus)
-    if focus_line:
-        lines.append(f"• Focus: {focus_line}")
 
     if use == "alarm":
         if material.wins:
-            lines.append(f"• Yesterday: {_compress(_humanize_line(material.wins[0]))}")
-        if len(material.wins) > 1:
-            lines.append(f"• Also landed: {_compress(_humanize_line(material.wins[1]))}")
+            lines.append(f"• Yesterday's signal: {_compress(_humanize_line(material.wins[0]))}")
         if material.next_actions:
-            lines.append(f"• Today: {_compress(_humanize_line(material.next_actions[0]))}")
+            lines.append(f"• First move today: {_compress(_humanize_line(material.next_actions[0]))}")
+        elif len(material.wins) > 1:
+            lines.append(f"• Carry forward: {_compress(_humanize_line(material.wins[1]))}")
+        lines.append("• Wake cue: re-enter the work with orientation, not hype.")
     elif use == "reminder":
         if material.wins:
-            lines.append(f"• State: {_compress(_humanize_line(material.wins[0]))}")
+            lines.append(f"• Current state: {_compress(_humanize_line(material.wins[0]))}")
         if material.blockers:
-            lines.append(f"• Tension: {_compress(_humanize_line(material.blockers[0]))}")
-        if material.next_actions:
-            lines.append(f"• Direction: {_compress(_humanize_line(material.next_actions[0]))}")
+            lines.append(f"• Don't forget: {_compress(_humanize_line(material.blockers[0]))}")
+        elif material.next_actions:
+            lines.append(f"• Remember next: {_compress(_humanize_line(material.next_actions[0]))}")
+        lines.append("• Reminder cue: keep the map clear and the tension visible.")
     elif use == "celebrate":
         if material.wins:
-            lines.append(f"• Shipped: {_compress(_humanize_line(material.wins[0]))}")
+            lines.append(f"• Win: {_compress(_humanize_line(material.wins[0]))}")
         if len(material.wins) > 1:
-            lines.append(f"• Solved: {_compress(_humanize_line(material.wins[1]))}")
-        if material.next_actions:
-            lines.append(f"• Why it matters: {_compress(_humanize_line(material.next_actions[0]))}")
+            lines.append(f"• Change: {_compress(_humanize_line(material.wins[1]))}")
+        lines.append("• Replay cue: make the completed work feel earned.")
     elif use == "next_steps":
-        if material.wins:
-            lines.append(f"• Now: {_compress(_humanize_line(material.wins[0]))}")
         if material.next_actions:
-            lines.append(f"• Next: {_compress(_humanize_line(material.next_actions[0]))}")
-        elif len(material.wins) > 1:
-            lines.append(f"• Next: {_compress(_humanize_line(material.wins[1]))}")
+            lines.append(f"• Move: {_compress(_humanize_line(material.next_actions[0]))}")
+        elif material.wins:
+            lines.append(f"• From here: {_compress(_humanize_line(material.wins[0]))}")
         if material.blockers:
             lines.append(f"• Watch: {_compress(_humanize_line(material.blockers[0]))}")
+        lines.append("• Launch cue: less recap, more action.")
 
+    if focus_line and use not in {"alarm", "reminder", "celebrate", "next_steps"}:
+        lines.insert(0, f"• Focus: {focus_line}")
     lines.append(f"• {helper['pulse_label']}: {keywords}")
     return "\n".join(lines)
 
@@ -192,17 +196,19 @@ def build_lyrics(material: SessionMaterial, pulse: str, request: RunRequest, sty
     verse_c = _compress(best[2] if len(best) > 2 else "next move is the highest leverage one", 12)
     bridge = USE_HELPERS.get(use, USE_HELPERS["alarm"])["bridge"]
 
-    if use == "alarm" and material.wins:
-        verse_a = f"Yesterday hit: {_compress(_humanize_line(material.wins[0]), 12)}"
-    elif use == "reminder" and material.wins:
-        verse_a = f"Current state: {_compress(_humanize_line(material.wins[0]), 12)}"
+    if use == "alarm":
+        verse_a = f"Wake back in: {_compress(_humanize_line(material.wins[0]), 12)}" if material.wins else "Wake back in, find the thread, choose the first move"
+        verse_b = f"First move: {_compress(_humanize_line(material.next_actions[0]), 12)}" if material.next_actions else verse_b
+    elif use == "reminder":
+        verse_a = f"State check: {_compress(_humanize_line(material.wins[0]), 12)}" if material.wins else "State check, hold the map, don't lose the thread"
+        verse_b = f"Remember: {_compress(_humanize_line((material.blockers or material.next_actions or ['keep the next decision visible'])[0]), 12)}"
     elif use == "celebrate" and material.wins:
-        verse_a = f"We shipped: {_compress(_humanize_line(material.wins[0]), 12)}"
-    elif use == "next_steps" and material.next_actions:
-        verse_a = f"Next up: {_compress(_humanize_line(material.next_actions[0]), 12)}"
+        verse_a = f"Win replay: {_compress(_humanize_line(material.wins[0]), 12)}"
+    elif use == "next_steps":
+        verse_a = f"Move now: {_compress(_humanize_line(material.next_actions[0]), 12)}" if material.next_actions else "Move now, pick the lever, make the next cut"
 
     duration_seconds = request.duration_seconds or 45
-    intro_line = focus_line.capitalize() if focus_line else style.intro_seed
+    intro_line = USE_HELPERS.get(use, USE_HELPERS["alarm"])["fallback_intro"]
     lines = [
         f"[{use.replace('_', ' ').title()} Track | genre={style.key} | ~{duration_seconds}s]",
         "",
@@ -217,7 +223,7 @@ def build_lyrics(material: SessionMaterial, pulse: str, request: RunRequest, sty
         verse_a,
         verse_b,
         verse_c,
-        (f"Keep it on: {focus_line}" if focus_line else "Hold the line and keep the point sharp"),
+        (f"Keep it aimed: {focus_line}" if focus_line and use == "next_steps" else "Hold the line and keep the point sharp"),
         bridge,
         "",
         "[Hook]",

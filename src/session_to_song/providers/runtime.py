@@ -127,14 +127,12 @@ Rules:
 - Respect use={artifact_use}, genre={style.label}, duration_seconds={request.duration_seconds or user_config.duration_seconds}.
 - Use decides content. Genre decides sound.
 - If the focus is strategic/business-oriented, answer that focus inside the artifact instead of forcing a generic recap.
-- For alarm: this is a wake-up alarm that should feel like dream replacement and mission re-entry.
-- For alarm: combine what happened in the work session with the deeper direction/meaning from any dream context.
-- For alarm: explicitly answer both "what did I do?" and "where am I going?"
-- For alarm: do not sound like a celebration recap unless the source is overwhelmingly celebratory.
-- For alarm: prioritize orientation, continuity, identity, and momentum at wake-up.
-- For reminder: explain state, direction, and blocker/tension if present.
-- For celebrate: make it feel like payoff for real shipped work.
-- For next_steps: make the next concrete moves obvious and energizing.
+- For alarm: this is mission re-entry after sleep. It must orient the listener into today, not simply celebrate what shipped.
+- For alarm: use yesterday as context, then point at today’s first move and why getting up matters.
+- For alarm: avoid phrases like "what shipped and why it matters" unless the source itself says that.
+- For reminder: this is a status/reminder artifact. It should preserve state, unresolved tension, decisions, and what must not be forgotten. It should not sound like a victory lap.
+- For celebrate: this is payoff. Make completed work feel earned, replayable, and specific.
+- For next_steps: this is a launch command. Prioritize the next concrete move over recap.
 - The pulse should be 3-5 short bullet lines.
 - The lyrics field may be spoken-word / structured lines, not necessarily a song chorus.
 - The music_prompt should be usable as a generation prompt and should mention the focus explicitly.

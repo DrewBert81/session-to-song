@@ -100,6 +100,9 @@ Next ExampleProject step is validating the generated alarm artifact.
             with patch.dict(os.environ, {}, clear=True):
                 artifacts = build_from_material(material, user_config, request)
             self.assertIn("[Reminder Track", artifacts.lyrics)
+            self.assertIn("State check", artifacts.lyrics)
+            self.assertIn("Current state", artifacts.pulse)
+            self.assertNotIn("what shipped", artifacts.pulse.lower())
             self.assertEqual(artifacts.manifest["genre"], "rock")
             self.assertEqual(artifacts.manifest["focus"], "where the project stands and where it is going")
             self.assertEqual(artifacts.manifest["duration_seconds"], 45)
@@ -118,9 +121,24 @@ Next ExampleProject step is validating the generated alarm artifact.
             self.assertIn("~30s", artifacts.lyrics)
             self.assertEqual(artifacts.manifest["genre"], "rap")
             self.assertEqual(artifacts.manifest["duration_seconds"], 30)
-            self.assertIn("Shipped:", artifacts.pulse)
+            self.assertIn("Win:", artifacts.pulse)
+            self.assertIn("Replay cue", artifacts.pulse)
             self.assertIn("30-second celebrate track", artifacts.music_prompt)
             self.assertIn("do not deliver a full-length song", artifacts.music_prompt)
+
+    def test_use_changes_narrative_theme(self) -> None:
+        material = load_text_file_material(Path(__file__).resolve().parents[1] / "content" / "input" / "sample_day.txt")
+        user_config = load_user_config()
+        user_config.llm_provider = "byok"
+        with patch.dict(os.environ, {}, clear=True):
+            alarm = build_from_material(material, user_config, resolve_run_request(user_config, RunRequest(use="alarm")))
+            reminder = build_from_material(material, user_config, resolve_run_request(user_config, RunRequest(use="reminder")))
+            celebrate = build_from_material(material, user_config, resolve_run_request(user_config, RunRequest(use="celebrate")))
+        self.assertIn("Wake cue", alarm.pulse)
+        self.assertIn("Reminder cue", reminder.pulse)
+        self.assertIn("Replay cue", celebrate.pulse)
+        self.assertNotEqual(alarm.pulse, reminder.pulse)
+        self.assertNotEqual(reminder.pulse, celebrate.pulse)
 
     def test_template_path_strips_dev_jargon_from_lyrics(self) -> None:
         sample = """
