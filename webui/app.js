@@ -431,11 +431,11 @@ async function publishMorningAlarm() {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.detail || data.error || 'Alarm slot update failed');
-    setStatus('Updated phone alarm slot: S2S-morning.mp3', 'success');
-    els.audioMeta.textContent = `Updated ${data.target_path}. Android Clock should keep using that stable file.`;
+    setStatus('Saved to phone alarm slot: S2S-morning.mp3', 'success');
+    els.audioMeta.textContent = `Saved ${data.target_path}. Android Clock should keep using that stable file.`;
   } catch (err) {
-    setStatus(`Alarm slot error: ${err.message}`, 'error');
-    els.audioMeta.textContent = 'Could not update the Drive alarm slot. Paste the local Drive alarm folder path and try again.';
+    setStatus(`Phone alarm slot error: ${err.message}`, 'error');
+    els.audioMeta.textContent = 'Could not save S2S-morning.mp3. Browse to the local Drive/iCloud sync folder and try again.';
   } finally {
     els.publishMorningBtn.disabled = false;
   }

@@ -554,12 +554,27 @@ pre { margin: 0; font-family: var(--font-mono); }
   transition: all var(--transition);
 }
 .mini-btn:hover { background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.3); }
+.mini-btn--primary { color: white; background: rgba(124, 58, 237, 0.45); border-color: rgba(167, 139, 250, 0.35); }
+.mini-btn--primary:hover { background: rgba(124, 58, 237, 0.65); border-color: rgba(167, 139, 250, 0.5); }
 .mini-btn:disabled, .mini-btn[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; pointer-events: none; }
-.alarm-slot-row { margin-top: 10px; }
+.alarm-slot-card {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(167, 139, 250, 0.14);
+  background: rgba(124, 58, 237, 0.06);
+  text-align: left;
+}
+.alarm-slot-card__header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.alarm-slot-card__header strong { font-size: 12px; color: var(--text); }
+.alarm-slot-card__header span { color: var(--text-dim); font-size: 11px; }
+.alarm-slot-card code { font-family: var(--font-mono); color: var(--accent-blue); }
+.alarm-slot-copy { color: var(--text-secondary); font-size: 11px; line-height: 1.45; margin-bottom: 9px; }
 .alarm-slot-input { width: 100%; font-size: 12px; padding: 9px 11px; }
-.alarm-slot-actions { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 8px; }
+.alarm-slot-actions { display: flex; gap: 6px; justify-content: flex-start; flex-wrap: wrap; margin-top: 8px; }
 .alarm-slot-actions .mini-btn { padding: 5px 9px; font-size: 11px; }
 .alarm-slot-hint { color: var(--text-dim); font-size: 11px; margin-top: 7px; line-height: 1.35; }
+.alarm-slot-nightly { color: var(--accent-orange); font-size: 11px; margin-top: 7px; }
 .audio-card__meta { font-size: 12px; color: var(--text-dim); margin-top: 8px; }
 
 /* ─── ARTIFACT PANELS ────────────────────────── */

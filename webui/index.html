@@ -148,17 +148,23 @@
           <audio id="audioPlayer" controls preload="none"></audio>
           <div class="audio-card__actions">
             <button id="playLocalBtn" class="mini-btn" type="button" disabled>Play on this computer</button>
-            <button id="publishMorningBtn" class="mini-btn" type="button" disabled>Update phone alarm</button>
+            <button id="publishMorningBtn" class="mini-btn mini-btn--primary" type="button" disabled>Save to phone alarm slot</button>
             <a id="downloadAudioLink" class="mini-btn mini-btn--link" href="/api/files?name=audio" download="session-to-song.mp3" aria-disabled="true">Download MP3</a>
           </div>
-          <div class="alarm-slot-row">
-            <input id="alarmSlotDirInput" class="text-input alarm-slot-input" placeholder="Drive alarm folder, e.g. C:\\Users\\you\\My Drive\\sessiontosong\\alarms">
-            <div class="alarm-slot-actions">
-              <button id="pickAlarmFolderBtn" class="mini-btn" type="button">Choose folder</button>
-              <button id="googleDriveDefaultBtn" class="mini-btn" type="button">Google Drive</button>
-              <button id="icloudDefaultBtn" class="mini-btn" type="button">iCloud</button>
+          <div class="alarm-slot-card">
+            <div class="alarm-slot-card__header">
+              <strong>Phone alarm slot</strong>
+              <span>Writes <code>S2S-morning.mp3</code></span>
             </div>
-            <p id="alarmSlotHint" class="alarm-slot-hint">Pick the local folder that syncs to your phone alarm file.</p>
+            <p class="alarm-slot-copy">Choose the local Drive/iCloud folder your phone alarm reads from. S2S overwrites the same filename so Android Clock keeps using today’s track.</p>
+            <input id="alarmSlotDirInput" class="text-input alarm-slot-input" placeholder="Example: G:\\My Drive\\sessiontosong alarms">
+            <div class="alarm-slot-actions">
+              <button id="pickAlarmFolderBtn" class="mini-btn" type="button">Browse on this PC</button>
+              <button id="googleDriveDefaultBtn" class="mini-btn" type="button">Find Google Drive</button>
+              <button id="icloudDefaultBtn" class="mini-btn" type="button">Find iCloud</button>
+            </div>
+            <p id="alarmSlotHint" class="alarm-slot-hint">Step 1: pick the sync folder. Step 2: generate audio. Step 3: save it to the phone alarm slot.</p>
+            <p class="alarm-slot-nightly">Nightly auto-update: not scheduled yet.</p>
           </div>
           <p class="audio-card__meta" id="audioMeta">Generate a draft, then create audio.</p>
         </div>
