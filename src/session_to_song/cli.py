@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -16,7 +17,7 @@ from .config_loader import (
     resolve_run_request,
     save_user_config_data,
 )
-from .domain import LEGACY_MODE_TO_USE, LEGACY_STYLE_TO_GENRE, RunRequest
+from .domain import LEGACY_MODE_TO_USE, LEGACY_STYLE_TO_GENRE, RunRequest, SessionMaterial
 from .pipeline import build_from_material
 from .pipeline.session_material import extract_material_from_session, load_recent_dream_context
 from .playback import PlaybackError, play_audio
@@ -148,6 +149,23 @@ def build_parser() -> argparse.ArgumentParser:
     morning_parser.add_argument("--llm-model", default="", help="Optional one-run text writer model")
     morning_parser.add_argument("--music-provider", default="", help="Optional one-run music provider")
     morning_parser.add_argument("--music-model", default="", help="Optional one-run music model")
+
+    celebrate_parser = subparsers.add_parser("celebrate-push", help="Generate and optionally play a celebration song after a successful git push")
+    celebrate_parser.add_argument("--config", default="", help="Optional path to user config JSON")
+    celebrate_parser.add_argument("--outdir", default="content/output/push-celebration", help="Directory for generated artifacts")
+    celebrate_parser.add_argument("--project", default="session-to-song", help="Project label for the celebration")
+    celebrate_parser.add_argument("--genre", choices=GENRES, default="rock")
+    celebrate_parser.add_argument("--duration", type=_validate_duration, default=30)
+    celebrate_parser.add_argument("--focus", default="celebrate a successful GitHub push and the work that just shipped")
+    celebrate_parser.add_argument("--sound-reference", default="short victorious celebration anthem, punchy drums, bright hook, energetic but not cheesy")
+    celebrate_parser.add_argument("--summary", default="", help="Optional pushed-work summary to include in the song context")
+    celebrate_parser.add_argument("--play", action="store_true", help="Play the generated celebration audio locally")
+    celebrate_parser.add_argument("--backend", choices=["auto", "powershell", "ffplay", "vlc", "open"], default="auto")
+    celebrate_parser.add_argument("--no-block", action="store_true", help="Start playback and return immediately")
+    celebrate_parser.add_argument("--llm-provider", default="", help="Optional one-run text writer provider")
+    celebrate_parser.add_argument("--llm-model", default="", help="Optional one-run text writer model")
+    celebrate_parser.add_argument("--music-provider", default="", help="Optional one-run music provider")
+    celebrate_parser.add_argument("--music-model", default="", help="Optional one-run music model")
 
     doctor_parser = subparsers.add_parser("doctor", help="Inspect provider/env setup and show what will be used")
     doctor_parser.add_argument("--config", default="", help="Optional user config path")
@@ -393,6 +411,43 @@ def _write_alarm_status(outdir: Path, payload: dict) -> None:
     (outdir / "last_alarm_status.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
+def _git_context(summary: str, project: str) -> SessionMaterial:
+    def run_git(args: list[str]) -> str:
+        try:
+            return subprocess.check_output(["git", *args], text=True, stderr=subprocess.DEVNULL).strip()
+        except Exception:
+            return ""
+
+    branch = run_git(["branch", "--show-current"]) or "unknown branch"
+    remote = run_git(["remote", "get-url", "origin"]) or "unknown remote"
+    commits = run_git(["log", "--oneline", "-5"]) or "No recent commit list available."
+    status = run_git(["status", "--short"]) or "Working tree clean after push."
+    raw_text = "\n".join(
+        part
+        for part in [
+            f"Project: {project}",
+            f"Branch: {branch}",
+            f"Remote: {remote}",
+            "Event: Successful git push.",
+            f"Summary: {summary}" if summary else "",
+            "Recent commits:",
+            commits,
+            "Current status:",
+            status,
+        ]
+        if part
+    )
+    return SessionMaterial(
+        source="git-push",
+        title=f"{project} push celebration",
+        raw_text=raw_text,
+        project=project,
+        wins=["A successful GitHub push shipped new work."],
+        next_actions=["Celebrate briefly, then keep building."],
+        metadata={"branch": branch, "remote": remote},
+    )
+
+
 def _handle_morning_alarm(args: argparse.Namespace) -> int:
     user_config = load_user_config(args.config or None)
     if args.llm_provider:
@@ -462,6 +517,58 @@ def _handle_morning_alarm(args: argparse.Namespace) -> int:
         "alarm_slot": slot.to_dict(),
     }
     _write_alarm_status(outdir, result)
+    print(json.dumps(result, indent=2))
+    return 0
+
+
+def _handle_celebrate_push(args: argparse.Namespace) -> int:
+    user_config = load_user_config(args.config or None)
+    if args.llm_provider:
+        user_config.llm_provider = args.llm_provider
+    if args.llm_model:
+        user_config.llm_model = args.llm_model
+    if args.music_provider:
+        user_config.music_provider = args.music_provider
+    if args.music_model:
+        user_config.music_model = args.music_model
+
+    request = resolve_run_request(
+        user_config,
+        RunRequest(
+            use="celebrate",
+            genre=args.genre,
+            focus=args.focus,
+            sound_reference=args.sound_reference,
+            delivery="milestone",
+            duration_seconds=args.duration,
+            source_mode="manual",
+            project=args.project or None,
+        ),
+    )
+    outdir = Path(args.outdir)
+    material = _git_context(args.summary, args.project)
+    artifacts = build_from_material(material, user_config, request)
+    files = write_artifacts(outdir, artifacts)
+    generated = generate_music_audio(
+        prompt=artifacts.music_prompt,
+        out_dir=outdir,
+        duration_seconds=request.duration_seconds or user_config.duration_seconds,
+        user_config=user_config,
+        preferred_model=args.music_model or None,
+        preferred_provider=args.music_provider or None,
+    )
+    result = {
+        "ok": True,
+        "updated_at": datetime.now().isoformat(),
+        "source": material.source,
+        "artifacts": {key: str(path) for key, path in files.items()},
+        "audio": {"path": str(generated.path), "provider": generated.provider, "model": generated.model},
+        "played": False,
+    }
+    if args.play:
+        playback = play_audio(generated.path, backend=args.backend, block=not args.no_block)
+        result["played"] = True
+        result["playback"] = playback.to_dict()
     print(json.dumps(result, indent=2))
     return 0
 
@@ -556,6 +663,8 @@ def main() -> int:
         return _handle_alarm_slot(args)
     if args.command == "morning-alarm":
         return _handle_morning_alarm(args)
+    if args.command == "celebrate-push":
+        return _handle_celebrate_push(args)
     if args.command == "doctor":
         return _handle_doctor(args)
     raise SystemExit(f"Unknown command: {args.command}")

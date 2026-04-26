@@ -342,6 +342,22 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "scripts\run_morning_ala
 
 An external scheduler such as OpenClaw cron or Windows Task Scheduler can call that wrapper. For true audible local-speaker alarms, keep the computer awake and use `session-to-song play` at trigger time.
 
+### Celebrate after a push
+
+Git itself does not have a reliable built-in post-push hook. To celebrate only after a successful push, use the wrapper:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "scripts\push_and_celebrate.ps1" origin master
+```
+
+The wrapper runs `git push` with the arguments you pass it. If the push succeeds, it runs:
+
+```bash
+session-to-song celebrate-push --project "session-to-song" --play --no-block
+```
+
+This generates a short celebration track from recent git context and plays it locally. If the push fails, celebration is skipped.
+
 ## Outputs
 
 Each run writes:
