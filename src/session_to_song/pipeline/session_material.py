@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 from datetime import datetime
 
@@ -140,6 +141,9 @@ def _looks_like_noise_line(text: str) -> bool:
         return True
     if any(token in lowered for token in [
         "caption:", "[hook]", "[verse]", "[intro]", "reference pulse",
+        "celebrate track | genre=", "same lyrics as the last song", "crappy sessions info",
+        "fully untracked in git status, so i did not commit",
+        "open: http", "running locally", "started it from", "status check", "keys present", "web app running",
         "toolresult", "non-text content", "backenddomnodeid", "fullscreenelement",
         "current url", "mockup", "dream recap track", "track opens with", "send me",
         "pick for me", "any calendar hard stops", "source preview card text",
@@ -330,6 +334,47 @@ def load_dream_context_enriched(limit_entries: int = 3, dreams_path: Path | None
     return "\n\n".join(parts)
 
 
+def _run_git(repo: Path, *args: str) -> str:
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=repo,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except Exception:
+        return ""
+    return (result.stdout or result.stderr or "").strip()
+
+
+def load_project_repo_context(project: str | None) -> str:
+    """Add live repo state for project-scoped songs so GitHub status is current."""
+    if not project or not re.search(r"\bsessions?\s+(?:to|two|2)\s+songs?\b|session-to-song", project, re.IGNORECASE):
+        return ""
+    repo = Path(__file__).resolve().parents[3]
+    if not (repo / ".git").exists():
+        return ""
+    branch = _run_git(repo, "branch", "--show-current")
+    remote = _run_git(repo, "remote", "get-url", "origin")
+    status = _run_git(repo, "status", "--short")
+    log = _run_git(repo, "log", "--oneline", "-5")
+    lines = ["Live session-to-song GitHub/repo state:"]
+    if branch:
+        lines.append(f"- Git branch is {branch}.")
+    if remote:
+        lines.append(f"- GitHub remote is {remote}.")
+    if status:
+        change_count = len([line for line in status.splitlines() if line.strip()])
+        lines.append(f"- Working tree has {change_count} pending file change(s).")
+    else:
+        lines.append("- Working tree is clean.")
+    if log:
+        lines.append("- Recent commits: " + " | ".join(log.splitlines()[:5]))
+    return "\n".join(lines)
+
+
 def _extract_daily_session_excerpt(source: ResolvedSource) -> str:
     if not source.session_id or not source.started_at:
         return ""
@@ -371,8 +416,8 @@ USE_SOURCING_STRATEGY = {
     "celebrate": {
         "include_dreams": False,
         "include_wiki": False,
-        "include_previous_days": True,
-        "include_memory": True,
+        "include_previous_days": False,
+        "include_memory": False,
         "fact_limit": 16,
     },
     "reminder": {
@@ -430,8 +475,10 @@ def extract_material_from_session(
         wiki_context = filter_text_for_project(wiki_context, project)
         previous_day_context = filter_text_for_project(previous_day_context, project)
 
+    repo_context = load_project_repo_context(project)
+
     # Combine all text sources for fact extraction
-    all_sources = [cleaned, archived_cleaned, memory_context]
+    all_sources = [repo_context, cleaned, archived_cleaned, memory_context]
     if dream_context:
         all_sources.append(dream_context)
     if wiki_context:
@@ -452,6 +499,8 @@ def extract_material_from_session(
             combined_text += f"\n\nWiki context (project state and direction):\n{wiki_context[:3000]}"
         if previous_day_context:
             combined_text += f"\n\nPrevious day sessions:\n{previous_day_context[:3000]}"
+        if repo_context:
+            combined_text += f"\n\nLive repo context:\n{repo_context[:2000]}"
         if memory_context:
             combined_text += f"\n\nRecent memory context:\n{memory_context[:2500]}"
         if archived_cleaned:
@@ -481,8 +530,8 @@ def extract_material_from_session(
             "curated_facts": curated_facts,
             "decisions": decisions,
             "memory_context": memory_context[:2500] if memory_context else "",
-            "dream_context": dream_context[:2000] if dream_context else "",
-            "wiki_context": wiki_context[:2000] if wiki_context else "",
+            "repo_context": repo_context[:2000] if repo_context else "",
+            "dream_context": dream_context[:2000] if dream_context else "",            "wiki_context": wiki_context[:2000] if wiki_context else "",
             "previous_day_context": previous_day_context[:2000] if previous_day_context else "",
             "use": use or "",
             "theme": infer_theme(cleaned),

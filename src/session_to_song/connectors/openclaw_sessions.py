@@ -142,6 +142,10 @@ def _message_signal_score(text: str) -> float:
         score -= 4.0
     if re.search(r"\b(read heartbeat\.md|conversation info|sender \(untrusted metadata\)|system \(untrusted\))\b", lowered):
         score -= 4.0
+    if re.search(r"\b(crappy sessions? info|same lyrics as the last song|asking it to talk about|celebrate track \| genre=|reference pulse|generated_audio|lyrics\.txt)\b", lowered):
+        score -= 5.0
+    if re.search(r"\b(open:\s*http|running locally|started it from|status check|keys present|web app running|left the web app running|server process is running)\b", lowered):
+        score -= 3.0
     # OpenClaw system/infrastructure noise
     if re.search(r"\bport=\d+\b", lowered):
         score -= 4.0
@@ -207,7 +211,7 @@ def _select_meaningful_lines(lines: list[str], limit: int) -> list[str]:
             continue
         scored.append((idx, score, line))
     if not scored:
-        return lines[-limit:]
+        return []
     scored.sort(key=lambda item: (item[1], item[0]), reverse=True)
     selected = sorted(scored[:limit], key=lambda item: item[0])
     return [line for _, _, line in selected]
@@ -338,6 +342,11 @@ def score_session_candidate(session: dict, transcript: str, project: str | None 
     progress_hits = sum(lowered.count(word) for word in ["built", "fixed", "done", "shipped", "working", "launched", "implemented"])
     next_hits = sum(lowered.count(word) for word in ["next", "need to", "follow up", "today", "tomorrow", "blocker", "stuck", "waiting"])
     progress_score = min((progress_hits + next_hits) / 8.0, 1.0)
+    if re.search(r"\b(crappy sessions? info|same lyrics as the last song|asking it to talk about|celebrate track \| genre=|reference pulse)\b", lowered):
+        progress_score = 0.0
+        recency_score *= 0.2
+    if re.search(r"\b(open:\s*http|running locally|started it from|status check|keys present|web app running|left the web app running|server process is running)\b", lowered):
+        progress_score *= 0.25
     project_score = 0.0
     if project and (project_matches(lowered, project) or project_matches(label, project)):
         project_score = 1.0
@@ -345,7 +354,12 @@ def score_session_candidate(session: dict, transcript: str, project: str | None 
         project_score = -0.25
     channel = str(session.get("channel") or "")
     channel_score = 0.2 if channel in {"telegram", "signal", "webchat"} else 0.0
-    score = recency_score * 0.4 + volume_score * 0.2 + progress_score * 0.3 + project_score * 0.1 + channel_score
+    label_score = 0.15 if project and project_matches(label, project) else 0.0
+    completion_score = 0.15 if re.search(r"\b(completed successfully|subagent task|implemented first-pass|public-readiness review)\b", lowered) else 0.0
+    noise_penalty = 0.0
+    if re.search(r"\b(system \(untrusted\)|exec failed|exec completed|http://|running locally|status check|keys present)\b", lowered):
+        noise_penalty = 0.25
+    score = recency_score * 0.35 + volume_score * 0.15 + progress_score * 0.25 + project_score * 0.15 + channel_score + label_score + completion_score - noise_penalty
     score = min(max(score, 0.0), 1.0)
     reason_bits: list[str] = []
     if recency_score > 0.6:

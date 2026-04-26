@@ -16,7 +16,8 @@ def project_terms(project: str | None) -> set[str]:
 
     Prefer whole project-name matches over broad token matches so a project like
     ``session-to-song`` does not accidentally match every line mentioning only
-    "session" or "song".
+    "session" or "song". Add a few canonical aliases for common spoken forms
+    so "sessions to songs build" still resolves to the session-to-song project.
     """
     raw = (project or "").strip()
     if not raw:
@@ -24,6 +25,8 @@ def project_terms(project: str | None) -> set[str]:
     normalized = _normalize_for_match(raw)
     compact = _compact_for_match(raw)
     terms = {term for term in {raw.lower(), normalized, compact} if len(term) >= 3}
+    if re.search(r"\bsessions?\s+(?:to|two|2)\s+songs?\b", normalized):
+        terms.update({"session-to-song", "session to song", "sessions to songs", "sessiontosong", "sessionstosongs"})
     tokens = normalized.split()
     if len(tokens) == 1 and len(tokens[0]) >= 3:
         terms.add(tokens[0])
