@@ -27,6 +27,7 @@ from .styles import STYLE_PRESETS
 ROOT = Path(__file__).resolve().parents[2]
 WEB_DIR = ROOT / "webui"
 WEB_OUTPUT_DIR = ROOT / "content" / "output" / "webui-latest"
+LATEST_AUDIO_PATH: Path | None = None
 
 USES = ["alarm", "reminder", "celebrate"]
 
@@ -384,9 +385,13 @@ if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
     return _json(start_response, {"path": selected})
 
 
+def _latest_audio_path() -> Path:
+    return LATEST_AUDIO_PATH or WEB_OUTPUT_DIR / "generated_audio.mp3"
+
+
 def _handle_publish_alarm_slot(start_response, payload: dict):
     name = (payload.get("name") or "audio").strip()
-    path = WEB_OUTPUT_DIR / "generated_audio.mp3" if name == "audio" else Path(payload.get("path") or "")
+    path = _latest_audio_path() if name == "audio" else Path(payload.get("path") or "")
     try:
         result = publish_alarm_slot(
             path,
@@ -400,7 +405,7 @@ def _handle_publish_alarm_slot(start_response, payload: dict):
 
 def _handle_play_audio(start_response, payload: dict):
     name = (payload.get("name") or "audio").strip()
-    path = WEB_OUTPUT_DIR / "generated_audio.mp3" if name == "audio" else Path(payload.get("path") or "")
+    path = _latest_audio_path() if name == "audio" else Path(payload.get("path") or "")
     try:
         result = play_audio(
             path,
@@ -435,6 +440,9 @@ def _handle_generate_audio(start_response, payload: dict):
         )
     except MusicGenerationError as exc:
         return _json(start_response, {"error": "audio_generation_failed", "detail": str(exc)}, "500 Internal Server Error")
+
+    global LATEST_AUDIO_PATH
+    LATEST_AUDIO_PATH = generated.path
 
     return _json(
         start_response,
@@ -560,7 +568,7 @@ def app(environ, start_response):
             "lyrics": WEB_OUTPUT_DIR / "lyrics.txt",
             "music_prompt": WEB_OUTPUT_DIR / "music_prompt.txt",
             "manifest": WEB_OUTPUT_DIR / "run_manifest.json",
-            "audio": WEB_OUTPUT_DIR / "generated_audio.mp3",
+            "audio": _latest_audio_path(),
         }
         target = allowed.get(name)
         if not target:

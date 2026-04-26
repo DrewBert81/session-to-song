@@ -11,6 +11,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from session_to_song.providers.audio_utils import trim_audio_to_mp3
 from session_to_song.providers.comfy_music import generate_comfy_music
 from session_to_song.providers.minimax_music import generate_minimax_music
 
@@ -31,6 +32,35 @@ class _FakeResponse:
 
 
 class MusicProviderRuntimeTests(unittest.TestCase):
+    def test_trim_audio_falls_back_to_unique_output_when_latest_is_locked(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "raw.mp3"
+            source.write_bytes(b"raw")
+            final = root / "generated_audio.mp3"
+            calls = {"replace": 0}
+
+            def fake_run(command, **kwargs):
+                Path(command[-1]).write_bytes(b"trimmed")
+                return type("Completed", (), {"returncode": 0, "stderr": ""})()
+
+            original_replace = Path.replace
+
+            def fake_replace(self, target):
+                if Path(target) == final:
+                    calls["replace"] += 1
+                    raise PermissionError("locked")
+                return original_replace(self, target)
+
+            with patch("session_to_song.providers.audio_utils.ffmpeg_available", return_value=True), patch(
+                "session_to_song.providers.audio_utils.subprocess.run", side_effect=fake_run
+            ), patch("pathlib.Path.replace", fake_replace):
+                output = trim_audio_to_mp3(source, final, 30)
+            self.assertNotEqual(output, final)
+            self.assertTrue(output.exists())
+            self.assertEqual(output.read_bytes(), b"trimmed")
+            self.assertGreaterEqual(calls["replace"], 1)
+
     def test_minimax_runtime_handles_generation_and_download(self) -> None:
         captured: dict[str, object] = {}
 
