@@ -15,6 +15,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from session_to_song.adapters import load_text_file_material
+from session_to_song.alarm_slots import publish_alarm_slot, slot_filename
 from session_to_song.cli import _handle_doctor
 from session_to_song.config_loader import load_config_data, load_user_config, resolve_genre, resolve_run_request, resolve_style, save_user_config_data
 from session_to_song.connectors.openclaw_sessions import SourceRequest, fetch_session_text, resolve_best_session_source
@@ -366,6 +367,24 @@ Need to keep validating the new flow and tightening edge cases.
         models = {(row["provider"], row["model"]): row for row in payload["llm_models"]}
         self.assertIn(("openai", "gpt-6-preview"), models)
         self.assertEqual(models[("openai", "gpt-6-preview")]["profile"], "detected")
+
+    def test_alarm_slot_publishes_stable_morning_filename(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "generated_audio.mp3"
+            target_dir = Path(tmp) / "My Drive" / "sessiontosong" / "alarms"
+            source.write_bytes(b"new alarm audio")
+            result = publish_alarm_slot(source, slot="morning", target_dir=target_dir)
+            self.assertTrue(result.ok)
+            self.assertEqual(result.filename, "S2S-morning.mp3")
+            self.assertEqual((target_dir / "S2S-morning.mp3").read_bytes(), b"new alarm audio")
+
+    def test_web_alarm_slot_endpoint_publishes_audio(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("session_to_song.web_app.publish_alarm_slot") as mocked:
+                mocked.return_value.to_dict.return_value = {"ok": True, "slot": "morning", "target_path": str(Path(tmp) / "S2S-morning.mp3")}
+                status, _, payload = self._call_wsgi("/api/alarm-slot", method="POST", body=json.dumps({"name": "audio", "slot": "morning", "target_dir": tmp}).encode("utf-8"))
+            self.assertEqual(status, "200 OK")
+            self.assertTrue(payload["ok"])
 
     def test_playback_open_backend_opens_existing_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -10,6 +10,7 @@ from urllib.parse import parse_qs
 from wsgiref.simple_server import make_server
 
 from .adapters.common import material_from_text
+from .alarm_slots import AlarmSlotError, publish_alarm_slot
 from .connectors.openclaw_sessions import SourceRequest, resolve_best_session_source
 from .config_loader import load_user_config, resolve_run_request
 from .domain import RunRequest
@@ -349,6 +350,20 @@ def _handle_resolve_source(start_response, params: dict[str, list[str]]):
     )
 
 
+def _handle_publish_alarm_slot(start_response, payload: dict):
+    name = (payload.get("name") or "audio").strip()
+    path = WEB_OUTPUT_DIR / "generated_audio.mp3" if name == "audio" else Path(payload.get("path") or "")
+    try:
+        result = publish_alarm_slot(
+            path,
+            slot=(payload.get("slot") or "morning"),
+            target_dir=(payload.get("target_dir") or None),
+        )
+    except AlarmSlotError as exc:
+        return _json(start_response, {"error": "alarm_slot_failed", "detail": str(exc)}, "500 Internal Server Error")
+    return _json(start_response, result.to_dict())
+
+
 def _handle_play_audio(start_response, payload: dict):
     name = (payload.get("name") or "audio").strip()
     path = WEB_OUTPUT_DIR / "generated_audio.mp3" if name == "audio" else Path(payload.get("path") or "")
@@ -490,6 +505,12 @@ def app(environ, start_response):
             return _handle_play_audio(start_response, _read_json_body(environ))
         except Exception as exc:  # pragma: no cover - debug path
             return _json(start_response, {"error": "playback_failed", "detail": str(exc)}, "500 Internal Server Error")
+
+    if path == "/api/alarm-slot" and method == "POST":
+        try:
+            return _handle_publish_alarm_slot(start_response, _read_json_body(environ))
+        except Exception as exc:  # pragma: no cover - debug path
+            return _json(start_response, {"error": "alarm_slot_failed", "detail": str(exc)}, "500 Internal Server Error")
 
     if path.startswith("/api/files"):
         params = parse_qs(environ.get("QUERY_STRING", ""))

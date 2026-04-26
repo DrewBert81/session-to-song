@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from .adapters import load_hermes_material, load_openclaw_material, load_text_file_material
+from .alarm_slots import AlarmSlotError, publish_alarm_slot
 from .connectors.openclaw_sessions import SourceRequest, resolve_best_session_source
 from .config_loader import (
     USER_CONFIG_PATH,
@@ -125,6 +126,11 @@ def build_parser() -> argparse.ArgumentParser:
     play_parser.add_argument("--volume", type=int, default=100, help="Playback volume 0-100 when supported")
     play_parser.add_argument("--no-block", action="store_true", help="Start playback and return immediately")
     play_parser.add_argument("--timeout", type=int, default=600, help="Maximum playback seconds for blocking backends")
+
+    slot_parser = subparsers.add_parser("alarm-slot", help="Publish an MP3 to a stable phone/Drive alarm slot")
+    slot_parser.add_argument("slot", nargs="?", default="morning", help="Slot name, e.g. morning, break, reminder")
+    slot_parser.add_argument("--file", default="content/output/webui-latest/generated_audio.mp3", help="Source MP3/audio file")
+    slot_parser.add_argument("--target-dir", default="", help="Folder synced to phone/Drive, e.g. My Drive/sessiontosong/alarms")
 
     doctor_parser = subparsers.add_parser("doctor", help="Inspect provider/env setup and show what will be used")
     doctor_parser.add_argument("--config", default="", help="Optional user config path")
@@ -343,6 +349,15 @@ def _handle_play(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_alarm_slot(args: argparse.Namespace) -> int:
+    try:
+        result = publish_alarm_slot(args.file, slot=args.slot, target_dir=args.target_dir or None)
+    except AlarmSlotError as exc:
+        raise SystemExit(f"Alarm slot publish failed: {exc}")
+    print(json.dumps(result.to_dict(), indent=2))
+    return 0
+
+
 def _handle_doctor(args: argparse.Namespace) -> int:
     user_config = load_user_config(args.config or None)
     status = detect_provider_status(
@@ -425,6 +440,8 @@ def main() -> int:
         return _handle_generate(args)
     if args.command == "play":
         return _handle_play(args)
+    if args.command == "alarm-slot":
+        return _handle_alarm_slot(args)
     if args.command == "doctor":
         return _handle_doctor(args)
     raise SystemExit(f"Unknown command: {args.command}")

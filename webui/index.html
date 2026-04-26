@@ -148,7 +148,11 @@
           <audio id="audioPlayer" controls preload="none"></audio>
           <div class="audio-card__actions">
             <button id="playLocalBtn" class="mini-btn" type="button" disabled>Play on this computer</button>
+            <button id="publishMorningBtn" class="mini-btn" type="button" disabled>Update phone alarm</button>
             <a id="downloadAudioLink" class="mini-btn mini-btn--link" href="/api/files?name=audio" download="session-to-song.mp3" aria-disabled="true">Download MP3</a>
+          </div>
+          <div class="alarm-slot-row">
+            <input id="alarmSlotDirInput" class="text-input alarm-slot-input" placeholder="Drive alarm folder, e.g. C:\\Users\\you\\My Drive\\sessiontosong\\alarms">
           </div>
           <p class="audio-card__meta" id="audioMeta">Generate a draft, then create audio.</p>
         </div>

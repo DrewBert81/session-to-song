@@ -65,7 +65,9 @@ const els = {
   cfgProject:        $('cfgProject'),
   audioPlayer:       $('audioPlayer'),
   playLocalBtn:      $('playLocalBtn'),
+  publishMorningBtn: $('publishMorningBtn'),
   downloadAudioLink: $('downloadAudioLink'),
+  alarmSlotDirInput: $('alarmSlotDirInput'),
   audioMeta:         $('audioMeta'),
   audioCanvas:       $('audioCanvas'),
   heroCanvas:        $('heroCanvas'),
@@ -340,6 +342,7 @@ async function generateAudio() {
     els.audioPlayer.src = audioUrl;
     els.audioPlayer.classList.add('visible');
     els.playLocalBtn.disabled = false;
+    els.publishMorningBtn.disabled = false;
     els.downloadAudioLink.setAttribute('aria-disabled', 'false');
     els.audioMeta.textContent = `Audio ready via ${data.provider} (${data.model}).`;
     renderFileLinks(true);
@@ -357,6 +360,29 @@ async function generateAudio() {
 /* ─── ONE-CLICK HERO FLOW ───────────────────── */
 function syncFocusToUse() {
   state.focus = FOCUS_FOR_USE[state.use] || '';
+}
+
+async function publishMorningAlarm() {
+  const targetDir = (els.alarmSlotDirInput?.value || '').trim();
+  if (targetDir) localStorage.setItem('s2sAlarmSlotDir', targetDir);
+  setStatus('Updating S2S-morning.mp3…');
+  els.publishMorningBtn.disabled = true;
+  try {
+    const res = await fetch('/api/alarm-slot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'audio', slot: 'morning', target_dir: targetDir || undefined }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || data.error || 'Alarm slot update failed');
+    setStatus('Updated phone alarm slot: S2S-morning.mp3', 'success');
+    els.audioMeta.textContent = `Updated ${data.target_path}. Android Clock should keep using that stable file.`;
+  } catch (err) {
+    setStatus(`Alarm slot error: ${err.message}`, 'error');
+    els.audioMeta.textContent = 'Could not update the Drive alarm slot. Paste the local Drive alarm folder path and try again.';
+  } finally {
+    els.publishMorningBtn.disabled = false;
+  }
 }
 
 async function playLocalAudio() {
@@ -523,6 +549,7 @@ els.heroCustomizeBtn.addEventListener('click', () => {
 els.generateBtn.addEventListener('click', generate);
 els.generateAudioBtn.addEventListener('click', generateAudio);
 els.playLocalBtn.addEventListener('click', playLocalAudio);
+els.publishMorningBtn.addEventListener('click', publishMorningAlarm);
 els.modelSelect.addEventListener('change', () => {});
 els.projectInput.addEventListener('input', () => {
   state.lastMusicPrompt = null;
@@ -543,4 +570,8 @@ els.artistInput.addEventListener('input', () => {
 /* ─── INIT ──────────────────────────────────── */
 initHeroViz();
 initAudioViz();
+if (els.alarmSlotDirInput) {
+  els.alarmSlotDirInput.value = localStorage.getItem('s2sAlarmSlotDir') || '';
+  els.alarmSlotDirInput.addEventListener('input', () => localStorage.setItem('s2sAlarmSlotDir', els.alarmSlotDirInput.value.trim()));
+}
 bootstrap();
