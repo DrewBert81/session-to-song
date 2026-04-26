@@ -16,6 +16,7 @@ from .config_loader import (
 from .domain import LEGACY_MODE_TO_USE, LEGACY_STYLE_TO_GENRE, RunRequest
 from .pipeline import build_from_material
 from .pipeline.session_material import extract_material_from_session, load_recent_dream_context
+from .playback import PlaybackError, play_audio
 from .providers import detect_provider_status
 from .storage import write_artifacts
 from .styles import STYLE_PRESETS
@@ -118,6 +119,13 @@ def build_parser() -> argparse.ArgumentParser:
     generate_parser = subparsers.add_parser("generate", help="Generate artifacts from an input file")
     _add_generate_fields(generate_parser, include_input_file=True)
 
+    play_parser = subparsers.add_parser("play", help="Play a generated MP3 on this computer")
+    play_parser.add_argument("file", nargs="?", default="content/output/webui-latest/generated_audio.mp3", help="MP3/audio file to play")
+    play_parser.add_argument("--backend", choices=["auto", "powershell", "ffplay", "vlc", "open"], default="auto")
+    play_parser.add_argument("--volume", type=int, default=100, help="Playback volume 0-100 when supported")
+    play_parser.add_argument("--no-block", action="store_true", help="Start playback and return immediately")
+    play_parser.add_argument("--timeout", type=int, default=600, help="Maximum playback seconds for blocking backends")
+
     doctor_parser = subparsers.add_parser("doctor", help="Inspect provider/env setup and show what will be used")
     doctor_parser.add_argument("--config", default="", help="Optional user config path")
 
@@ -190,6 +198,7 @@ def _handle_generate(args: argparse.Namespace) -> int:
                 session_key=request.source_session_key,
                 project=request.project,
                 lookback_hours=request.lookback_hours or 36,
+                use=request.resolved_use,
             )
         )
         if source is None:
@@ -319,6 +328,21 @@ def _doctor_next_steps(status) -> list[str]:
     return help_lines
 
 
+def _handle_play(args: argparse.Namespace) -> int:
+    try:
+        result = play_audio(
+            args.file,
+            backend=args.backend,
+            volume=args.volume,
+            block=not args.no_block,
+            timeout_seconds=args.timeout,
+        )
+    except PlaybackError as exc:
+        raise SystemExit(f"Playback failed: {exc}")
+    print(json.dumps(result.to_dict(), indent=2))
+    return 0
+
+
 def _handle_doctor(args: argparse.Namespace) -> int:
     user_config = load_user_config(args.config or None)
     status = detect_provider_status(
@@ -399,6 +423,8 @@ def main() -> int:
         return _handle_test(args)
     if args.command == "generate":
         return _handle_generate(args)
+    if args.command == "play":
+        return _handle_play(args)
     if args.command == "doctor":
         return _handle_doctor(args)
     raise SystemExit(f"Unknown command: {args.command}")

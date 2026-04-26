@@ -64,6 +64,8 @@ const els = {
   cfgGenre:          $('cfgGenre'),
   cfgProject:        $('cfgProject'),
   audioPlayer:       $('audioPlayer'),
+  playLocalBtn:      $('playLocalBtn'),
+  downloadAudioLink: $('downloadAudioLink'),
   audioMeta:         $('audioMeta'),
   audioCanvas:       $('audioCanvas'),
   heroCanvas:        $('heroCanvas'),
@@ -337,6 +339,8 @@ async function generateAudio() {
     const audioUrl = `${data.audio_url}&v=${Date.now()}`;
     els.audioPlayer.src = audioUrl;
     els.audioPlayer.classList.add('visible');
+    els.playLocalBtn.disabled = false;
+    els.downloadAudioLink.setAttribute('aria-disabled', 'false');
     els.audioMeta.textContent = `Audio ready via ${data.provider} (${data.model}).`;
     renderFileLinks(true);
     setStatus(`Done — your ${state.duration_seconds}s track is playing.`, 'success');
@@ -353,6 +357,27 @@ async function generateAudio() {
 /* ─── ONE-CLICK HERO FLOW ───────────────────── */
 function syncFocusToUse() {
   state.focus = FOCUS_FOR_USE[state.use] || '';
+}
+
+async function playLocalAudio() {
+  setStatus('Starting playback on this computer…');
+  els.playLocalBtn.disabled = true;
+  try {
+    const res = await fetch('/api/play-audio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'audio', backend: 'auto', volume: 100, block: false }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || data.error || 'Playback failed');
+    setStatus(`Playing locally via ${data.backend}.`, 'success');
+    els.audioMeta.textContent = `Playing on this computer via ${data.backend}. If BOT63 is the current output, it should hit the speakers.`;
+  } catch (err) {
+    setStatus(`Playback error: ${err.message}`, 'error');
+    els.audioMeta.textContent = 'Local playback failed. The browser player still works for preview.';
+  } finally {
+    els.playLocalBtn.disabled = false;
+  }
 }
 
 async function resolveSource() {
@@ -497,6 +522,7 @@ els.heroCustomizeBtn.addEventListener('click', () => {
 });
 els.generateBtn.addEventListener('click', generate);
 els.generateAudioBtn.addEventListener('click', generateAudio);
+els.playLocalBtn.addEventListener('click', playLocalAudio);
 els.modelSelect.addEventListener('change', () => {});
 els.projectInput.addEventListener('input', () => {
   state.lastMusicPrompt = null;

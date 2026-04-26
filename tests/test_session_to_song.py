@@ -24,6 +24,7 @@ from session_to_song.providers.google_music import MusicGenerationError
 from session_to_song.providers.music_runtime import generate_music_audio, music_generation_available
 from session_to_song.pipeline import build_from_material
 from session_to_song.pipeline.session_material import extract_material_from_session, load_recent_dream_context, load_recent_memory_context
+from session_to_song.playback import play_audio, resolve_backend
 from session_to_song.project_filter import filter_text_for_project
 from session_to_song.storage import write_artifacts
 from session_to_song.web_app import app as web_app
@@ -365,6 +366,23 @@ Need to keep validating the new flow and tightening edge cases.
         models = {(row["provider"], row["model"]): row for row in payload["llm_models"]}
         self.assertIn(("openai", "gpt-6-preview"), models)
         self.assertEqual(models[("openai", "gpt-6-preview")]["profile"], "detected")
+
+    def test_playback_open_backend_opens_existing_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            audio = Path(tmp) / "song.mp3"
+            audio.write_bytes(b"fake mp3")
+            with patch("session_to_song.playback.os.startfile", create=True) as startfile:
+                result = play_audio(audio, backend="open", block=False)
+            self.assertTrue(result.ok)
+            self.assertEqual(result.backend, "open")
+            startfile.assert_called_once()
+
+    def test_web_play_audio_endpoint_uses_local_playback(self) -> None:
+        with patch("session_to_song.web_app.play_audio") as mocked:
+            mocked.return_value.to_dict.return_value = {"ok": True, "backend": "powershell", "path": "audio.mp3"}
+            status, _, payload = self._call_wsgi("/api/play-audio", method="POST", body=json.dumps({"name": "audio"}).encode("utf-8"))
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(payload["backend"], "powershell")
 
     def test_web_generate_audio_returns_clear_error_for_comfy_when_workflow_missing(self) -> None:
         body = json.dumps({"music_prompt": "Short hype track", "duration_seconds": 30}).encode("utf-8")

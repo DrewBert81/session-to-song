@@ -15,6 +15,7 @@ from .config_loader import load_user_config, resolve_run_request
 from .domain import RunRequest
 from .pipeline import build_from_material
 from .pipeline.session_material import extract_material_from_session, load_recent_dream_context
+from .playback import PlaybackError, play_audio
 from .providers.music_common import MusicGenerationError
 from .providers import detect_provider_status, generate_music_audio, music_generation_available
 from .storage import write_artifacts
@@ -348,6 +349,22 @@ def _handle_resolve_source(start_response, params: dict[str, list[str]]):
     )
 
 
+def _handle_play_audio(start_response, payload: dict):
+    name = (payload.get("name") or "audio").strip()
+    path = WEB_OUTPUT_DIR / "generated_audio.mp3" if name == "audio" else Path(payload.get("path") or "")
+    try:
+        result = play_audio(
+            path,
+            backend=(payload.get("backend") or "auto"),
+            volume=_bounded_int(payload.get("volume"), 100, minimum=0, maximum=100),
+            block=bool(payload.get("block") or False),
+            timeout_seconds=_bounded_int(payload.get("timeout_seconds"), 600, minimum=1, maximum=3600),
+        )
+    except PlaybackError as exc:
+        return _json(start_response, {"error": "playback_failed", "detail": str(exc)}, "500 Internal Server Error")
+    return _json(start_response, result.to_dict())
+
+
 def _handle_generate_audio(start_response, payload: dict):
     prompt = (payload.get("music_prompt") or "").strip()
     if not prompt:
@@ -467,6 +484,12 @@ def app(environ, start_response):
             return _handle_generate_audio(start_response, _read_json_body(environ))
         except Exception as exc:  # pragma: no cover - debug path
             return _json(start_response, {"error": "audio_generation_failed", "detail": str(exc)}, "500 Internal Server Error")
+
+    if path == "/api/play-audio" and method == "POST":
+        try:
+            return _handle_play_audio(start_response, _read_json_body(environ))
+        except Exception as exc:  # pragma: no cover - debug path
+            return _json(start_response, {"error": "playback_failed", "detail": str(exc)}, "500 Internal Server Error")
 
     if path.startswith("/api/files"):
         params = parse_qs(environ.get("QUERY_STRING", ""))
