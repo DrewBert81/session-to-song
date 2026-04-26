@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -33,6 +35,8 @@ class AlarmSlotResult:
 
 def slot_filename(slot: str) -> str:
     key = (slot or "morning").strip().lower()
+    if not re.fullmatch(r"[a-z0-9_-]+", key):
+        raise AlarmSlotError("Alarm slot must contain only letters, numbers, dashes, or underscores.")
     return SLOT_FILENAMES.get(key, f"S2S-{key}.mp3")
 
 
@@ -118,16 +122,28 @@ def publish_alarm_slot(
     *,
     slot: str = "morning",
     target_dir: str | Path | None = None,
+    create: bool = True,
+    retries: int = 5,
 ) -> AlarmSlotResult:
     source = Path(source_path).expanduser().resolve()
     if not source.exists() or not source.is_file():
         raise AlarmSlotError(f"Source audio file not found: {source}")
-    directory = resolve_alarm_slot_dir(target_dir)
+    directory = resolve_alarm_slot_dir(target_dir, create=create)
     filename = slot_filename(slot)
     target = directory / filename
     tmp_target = directory / f".{filename}.tmp"
     shutil.copyfile(source, tmp_target)
-    tmp_target.replace(target)
+    last_error: Exception | None = None
+    for attempt in range(max(1, retries)):
+        try:
+            tmp_target.replace(target)
+            break
+        except PermissionError as exc:
+            last_error = exc
+            time.sleep(min(0.25 * (attempt + 1), 1.5))
+    else:
+        tmp_target.unlink(missing_ok=True)
+        raise AlarmSlotError(f"Could not update {target}; it may be locked by sync or another app: {last_error}")
     return AlarmSlotResult(
         ok=True,
         slot=(slot or "morning"),

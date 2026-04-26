@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
+from datetime import datetime
 from pathlib import Path
 
 from .adapters import load_hermes_material, load_openclaw_material, load_text_file_material
@@ -19,6 +21,7 @@ from .pipeline import build_from_material
 from .pipeline.session_material import extract_material_from_session, load_recent_dream_context
 from .playback import PlaybackError, play_audio
 from .providers import detect_provider_status, generate_music_audio
+from .providers.audio_utils import ffmpeg_available
 from .storage import write_artifacts
 from .styles import STYLE_PRESETS
 
@@ -307,6 +310,10 @@ def _format_provider_line(option) -> str:
     return f"- {option.name}: {'available' if option.available else 'missing'} via {env_names} | default model={option.default_model} | {runtime}"
 
 
+def _google_genai_installed() -> bool:
+    return importlib.util.find_spec("google.genai") is not None
+
+
 def _doctor_status_lines(status) -> list[str]:
     lines = ["Text artifacts: ready (offline template mode always works)."]
     if status.llm.available and status.llm.runtime_supported:
@@ -317,7 +324,12 @@ def _doctor_status_lines(status) -> list[str]:
         lines.append(f"Live LLM artifacts: not ready. {status.llm.message}")
 
     if status.music.available and status.music.runtime_supported:
-        lines.append(f"Live audio: ready via {status.music.provider} [{status.music.model}].")
+        if not ffmpeg_available():
+            lines.append("Live audio: not ready. ffmpeg is required and was not found on PATH.")
+        elif status.music.provider == "google" and not _google_genai_installed():
+            lines.append("Live audio: not ready. Install google-genai for Google/Gemini/Lyria audio.")
+        else:
+            lines.append(f"Live audio: ready via {status.music.provider} [{status.music.model}].")
     elif status.music.provider == "unconfigured":
         lines.append("Live audio: optional. No music key found, so audio stays disabled and text artifacts still work.")
     else:
@@ -337,11 +349,15 @@ def _doctor_next_steps(status) -> list[str]:
         help_lines.append(status.llm.message)
 
     if status.music.provider == "unconfigured":
-        help_lines.append("For browser-playable audio, set GOOGLE_API_KEY or GEMINI_API_KEY. Google/Gemini is the supported live audio path in this repo today.")
+        help_lines.append("For browser-playable audio, set GOOGLE_API_KEY or GEMINI_API_KEY, MINIMAX_API_KEY, or configure Comfy.")
     elif status.music.source == "explicit" and not status.music.available:
         help_lines.append(status.music.message)
     elif status.music.available and not status.music.runtime_supported:
         help_lines.append(status.music.message)
+    if status.music.available and status.music.runtime_supported and not ffmpeg_available():
+        help_lines.append("Install ffmpeg and ensure it is on PATH before generating audio.")
+    if status.music.provider == "google" and status.music.available and not _google_genai_installed():
+        help_lines.append("Install Google audio dependency with `pip install google-genai` or `pip install -e .[google-audio]`.")
 
     if help_lines:
         help_lines.append("Copy .env.example to .env, add only the keys you plan to use, then rerun `session-to-song doctor`.")
@@ -372,6 +388,11 @@ def _handle_alarm_slot(args: argparse.Namespace) -> int:
     return 0
 
 
+def _write_alarm_status(outdir: Path, payload: dict) -> None:
+    outdir.mkdir(parents=True, exist_ok=True)
+    (outdir / "last_alarm_status.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
 def _handle_morning_alarm(args: argparse.Namespace) -> int:
     user_config = load_user_config(args.config or None)
     if args.llm_provider:
@@ -396,30 +417,36 @@ def _handle_morning_alarm(args: argparse.Namespace) -> int:
             project=args.project or None,
         ),
     )
-    source = resolve_best_session_source(
-        SourceRequest(
-            mode="auto",
-            project=request.project,
-            lookback_hours=request.lookback_hours or 72,
-            use=request.resolved_use,
-        )
-    )
-    if source is None:
-        raise SystemExit("No dated memory/wiki/dream/session source found for morning alarm.")
-    material = extract_material_from_session(source, title=source.label, use=request.resolved_use)
-    artifacts = build_from_material(material, user_config, request)
     outdir = Path(args.outdir)
-    files = write_artifacts(outdir, artifacts)
-    generated = generate_music_audio(
-        prompt=artifacts.music_prompt,
-        out_dir=outdir,
-        duration_seconds=request.duration_seconds or user_config.duration_seconds,
-        user_config=user_config,
-        preferred_model=args.music_model or None,
-        preferred_provider=args.music_provider or None,
-    )
-    slot = publish_alarm_slot(generated.path, slot="morning", target_dir=args.target_dir or None)
+    try:
+        source = resolve_best_session_source(
+            SourceRequest(
+                mode="auto",
+                project=request.project,
+                lookback_hours=request.lookback_hours or 72,
+                use=request.resolved_use,
+            )
+        )
+        if source is None:
+            raise RuntimeError("No dated memory/wiki/dream/session source found for morning alarm.")
+        material = extract_material_from_session(source, title=source.label, use=request.resolved_use)
+        artifacts = build_from_material(material, user_config, request)
+        files = write_artifacts(outdir, artifacts)
+        generated = generate_music_audio(
+            prompt=artifacts.music_prompt,
+            out_dir=outdir,
+            duration_seconds=request.duration_seconds or user_config.duration_seconds,
+            user_config=user_config,
+            preferred_model=args.music_model or None,
+            preferred_provider=args.music_provider or None,
+        )
+        slot = publish_alarm_slot(generated.path, slot="morning", target_dir=args.target_dir or None)
+    except Exception as exc:
+        _write_alarm_status(outdir, {"ok": False, "updated_at": datetime.now().isoformat(), "error": str(exc)})
+        raise SystemExit(f"Morning alarm failed: {exc}")
     result = {
+        "ok": True,
+        "updated_at": datetime.now().isoformat(),
         "source": {
             "mode": source.mode,
             "label": source.label,
@@ -434,6 +461,7 @@ def _handle_morning_alarm(args: argparse.Namespace) -> int:
         },
         "alarm_slot": slot.to_dict(),
     }
+    _write_alarm_status(outdir, result)
     print(json.dumps(result, indent=2))
     return 0
 
@@ -487,6 +515,10 @@ def _handle_doctor(args: argparse.Namespace) -> int:
             print(f"- {line}")
 
     if (status.llm.source == "explicit" and not status.llm.available) or (status.music.source == "explicit" and not status.music.available):
+        return 1
+    if status.music.available and status.music.runtime_supported and not ffmpeg_available():
+        return 1
+    if status.music.provider == "google" and status.music.available and not _google_genai_installed():
         return 1
     if status.llm.source == "explicit" and status.llm.provider == user_config.llm_provider and not status.llm.runtime_supported:
         return 1

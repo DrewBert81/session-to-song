@@ -36,6 +36,7 @@ const state = {
   genres: [],
   uses: ['alarm', 'reminder', 'celebrate'],
   durations: [30, 45, 60, 90],
+  writeToken: '',
 };
 
 /* ─── DOM REFS ──────────────────────────────── */
@@ -93,6 +94,7 @@ async function bootstrap() {
       uses:             data.uses || Object.keys(USE_META),
       durations:        data.durations || [30, 45, 60, 90],
       sourceModes:      data.source_modes || state.sourceModes,
+      writeToken:       data.write_token || '',
     });
 
     if (data.llm_models || data.llm_providers) {
@@ -286,7 +288,7 @@ async function generate() {
   try {
     const res = await fetch('/api/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-S2S-Token': state.writeToken },
       body: JSON.stringify(payload),
     });
     const data = await res.json();
@@ -332,7 +334,7 @@ async function generateAudio() {
 
     const res = await fetch('/api/generate-audio', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-S2S-Token': state.writeToken },
       body: JSON.stringify({
         music_prompt: state.lastMusicPrompt,
         duration_seconds: state.duration_seconds,
@@ -405,7 +407,7 @@ function useSuggestedAlarmDir(kind) {
 async function pickAlarmFolder() {
   els.alarmSlotHint.textContent = 'Opening folder picker on the OpenClaw host…';
   try {
-    const res = await fetch('/api/alarm-slot/pick-folder', { method: 'POST' });
+    const res = await fetch('/api/alarm-slot/pick-folder', { method: 'POST', headers: { 'X-S2S-Token': state.writeToken } });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.detail || data.error || 'Folder picker failed');
     if (data.cancelled) {
@@ -426,7 +428,7 @@ async function publishMorningAlarm() {
   try {
     const res = await fetch('/api/alarm-slot', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-S2S-Token': state.writeToken },
       body: JSON.stringify({ name: 'audio', slot: 'morning', target_dir: targetDir || undefined }),
     });
     const data = await res.json().catch(() => ({}));
@@ -447,7 +449,7 @@ async function playLocalAudio() {
   try {
     const res = await fetch('/api/play-audio', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-S2S-Token': state.writeToken },
       body: JSON.stringify({ name: 'audio', backend: 'auto', volume: 100, block: false }),
     });
     const data = await res.json().catch(() => ({}));

@@ -28,6 +28,7 @@ from session_to_song.pipeline.session_material import extract_material_from_sess
 from session_to_song.playback import play_audio, resolve_backend
 from session_to_song.project_filter import filter_text_for_project
 from session_to_song.storage import write_artifacts
+from session_to_song import web_app as web_app_module
 from session_to_song.web_app import app as web_app
 
 SAMPLE = """
@@ -39,7 +40,7 @@ Next step is validating the redesign end to end.
 
 
 class SessionToSongTests(unittest.TestCase):
-    def _call_wsgi(self, path: str, method: str = "GET", body: bytes = b"") -> tuple[str, dict[str, str], dict]:
+    def _call_wsgi(self, path: str, method: str = "GET", body: bytes = b"", headers: dict[str, str] | None = None) -> tuple[str, dict[str, str], dict]:
         captured: dict[str, object] = {}
 
         def start_response(status, headers):
@@ -53,6 +54,8 @@ class SessionToSongTests(unittest.TestCase):
             "CONTENT_LENGTH": str(len(body)),
             "wsgi.input": io.BytesIO(body),
         }
+        for key, value in (headers or {}).items():
+            environ[key] = value
         if "?" in path:
             clean_path, query = path.split("?", 1)
             environ["PATH_INFO"] = clean_path
@@ -322,7 +325,7 @@ Next move is making the morning alarm play through the phone slot.
                 config_path,
             )
             buffer = io.StringIO()
-            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-minimax"}, clear=True), redirect_stdout(buffer):
+            with patch.dict(os.environ, {"MINIMAX_API_KEY": "test-minimax"}, clear=True), patch("session_to_song.cli.ffmpeg_available", return_value=True), redirect_stdout(buffer):
                 exit_code = _handle_doctor(argparse.Namespace(config=str(config_path)))
         output = buffer.getvalue()
         self.assertEqual(exit_code, 0)
@@ -437,12 +440,55 @@ Next move is making the morning alarm play through the phone slot.
             self.assertEqual(result.filename, "S2S-morning.mp3")
             self.assertEqual((target_dir / "S2S-morning.mp3").read_bytes(), b"new alarm audio")
 
+    def test_alarm_slot_rejects_unsafe_slot_name(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "generated_audio.mp3"
+            target_dir = Path(tmp) / "alarms"
+            source.write_bytes(b"new alarm audio")
+            with self.assertRaises(Exception):
+                publish_alarm_slot(source, slot="../../bad", target_dir=target_dir)
+
+    def test_alarm_slot_reports_locked_target(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "generated_audio.mp3"
+            target_dir = Path(tmp) / "alarms"
+            target_dir.mkdir()
+            source.write_bytes(b"new alarm audio")
+            target = target_dir / "S2S-morning.mp3"
+            target.write_bytes(b"old")
+            original_replace = Path.replace
+
+            def fake_replace(self, target_path):
+                if Path(target_path) == target:
+                    raise PermissionError("locked")
+                return original_replace(self, target_path)
+
+            with patch("pathlib.Path.replace", fake_replace):
+                with self.assertRaises(Exception):
+                    publish_alarm_slot(source, slot="morning", target_dir=target_dir, retries=2)
+            self.assertEqual(target.read_bytes(), b"old")
+
     def test_web_alarm_slot_native_picker_endpoint_returns_selected_path(self) -> None:
         completed = type("Completed", (), {"returncode": 0, "stdout": "C:\\Users\\Owner\\My Drive\\sessiontosong\\alarms\n", "stderr": ""})()
         with patch("session_to_song.web_app.sys.platform", "win32"), patch("session_to_song.web_app.subprocess.run", return_value=completed):
-            status, _, payload = self._call_wsgi("/api/alarm-slot/pick-folder", method="POST")
+            status, _, payload = self._call_wsgi("/api/alarm-slot/pick-folder", method="POST", headers={"HTTP_X_S2S_TOKEN": web_app_module.WRITE_TOKEN})
         self.assertEqual(status, "200 OK")
         self.assertEqual(payload["path"], "C:\\Users\\Owner\\My Drive\\sessiontosong\\alarms")
+
+    def test_web_write_endpoints_require_token(self) -> None:
+        status, _, payload = self._call_wsgi("/api/play-audio", method="POST", body=json.dumps({"name": "audio"}).encode("utf-8"))
+        self.assertEqual(status, "403 Forbidden")
+        self.assertEqual(payload["error"], "forbidden")
+
+    def test_web_play_audio_rejects_arbitrary_path(self) -> None:
+        status, _, payload = self._call_wsgi(
+            "/api/play-audio",
+            method="POST",
+            body=json.dumps({"path": "C:/Windows/win.ini"}).encode("utf-8"),
+            headers={"HTTP_X_S2S_TOKEN": web_app_module.WRITE_TOKEN},
+        )
+        self.assertEqual(status, "400 Bad Request")
+        self.assertEqual(payload["error"], "bad_file")
 
     def test_web_alarm_slot_suggestions_endpoint_lists_drive_targets(self) -> None:
         status, _, payload = self._call_wsgi("/api/alarm-slot/suggestions")
@@ -457,7 +503,7 @@ Next move is making the morning alarm play through the phone slot.
         with tempfile.TemporaryDirectory() as tmp:
             with patch("session_to_song.web_app.publish_alarm_slot") as mocked:
                 mocked.return_value.to_dict.return_value = {"ok": True, "slot": "morning", "target_path": str(Path(tmp) / "S2S-morning.mp3")}
-                status, _, payload = self._call_wsgi("/api/alarm-slot", method="POST", body=json.dumps({"name": "audio", "slot": "morning", "target_dir": tmp}).encode("utf-8"))
+                status, _, payload = self._call_wsgi("/api/alarm-slot", method="POST", body=json.dumps({"name": "audio", "slot": "morning", "target_dir": tmp}).encode("utf-8"), headers={"HTTP_X_S2S_TOKEN": web_app_module.WRITE_TOKEN})
             self.assertEqual(status, "200 OK")
             self.assertTrue(payload["ok"])
 
@@ -474,7 +520,7 @@ Next move is making the morning alarm play through the phone slot.
     def test_web_play_audio_endpoint_uses_local_playback(self) -> None:
         with patch("session_to_song.web_app.play_audio") as mocked:
             mocked.return_value.to_dict.return_value = {"ok": True, "backend": "powershell", "path": "audio.mp3"}
-            status, _, payload = self._call_wsgi("/api/play-audio", method="POST", body=json.dumps({"name": "audio"}).encode("utf-8"))
+            status, _, payload = self._call_wsgi("/api/play-audio", method="POST", body=json.dumps({"name": "audio"}).encode("utf-8"), headers={"HTTP_X_S2S_TOKEN": web_app_module.WRITE_TOKEN})
         self.assertEqual(status, "200 OK")
         self.assertEqual(payload["backend"], "powershell")
 
@@ -484,7 +530,7 @@ Next move is making the morning alarm play through the phone slot.
         comfy_config.music_provider = "comfy"
         comfy_config.music_model = "workflow"
         with patch("session_to_song.web_app.load_user_config", return_value=comfy_config), patch.dict(os.environ, {"COMFY_API_KEY": "test-comfy"}, clear=True):
-            status, _, payload = self._call_wsgi("/api/generate-audio", method="POST", body=body)
+            status, _, payload = self._call_wsgi("/api/generate-audio", method="POST", body=body, headers={"HTTP_X_S2S_TOKEN": web_app_module.WRITE_TOKEN})
         self.assertEqual(status, "500 Internal Server Error")
         self.assertEqual(payload["error"], "audio_generation_failed")
         self.assertIn("COMFY_MUSIC_WORKFLOW_PATH", payload["detail"])

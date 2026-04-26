@@ -157,10 +157,10 @@ Recommended paths:
 - **Zero-key / offline:** leave `.env` empty and use template mode
 - **Best supported live text path:** set `OPENROUTER_API_KEY` or `OPENAI_API_KEY`
 - **Simple live audio path:** set `MINIMAX_API_KEY`
-- **Google/Gemini live audio path:** set `GOOGLE_API_KEY` or `GEMINI_API_KEY`
+- **Google/Gemini live audio path:** install `pip install -e .[google-audio]`, then set `GOOGLE_API_KEY` or `GEMINI_API_KEY`
 - **Comfy live audio path:** set `COMFY_MUSIC_WORKFLOW_PATH` and `COMFY_MUSIC_PROMPT_NODE_ID` (plus `COMFY_API_KEY`/`COMFY_CLOUD_API_KEY` if using cloud mode)
 
-Live audio requires `ffmpeg` on your PATH so the app can trim/export generated audio to MP3.
+Live audio requires `ffmpeg` on your PATH so the app can trim/export generated audio to MP3. `session-to-song doctor` checks for it.
 
 ### 3) Verify setup
 
@@ -328,7 +328,19 @@ The repo now has the pieces needed for a scheduled generated alarm:
 scheduled trigger -> generate alarm audio -> publish S2S-morning.mp3 -> Android Clock plays the stable slot
 ```
 
-An external scheduler such as OpenClaw cron or Windows Task Scheduler can call the CLI once the desired generation command is chosen. For true audible local-speaker alarms, keep the computer awake and use `session-to-song play` at trigger time.
+Use the built-in morning command for the nightly Android alarm file:
+
+```bash
+session-to-song morning-alarm --target-dir "G:\My Drive\Sessiontosong Alarms"
+```
+
+On Windows, prefer the hardened wrapper because it sets the repo root, checks `ffmpeg`, and writes logs:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "scripts\run_morning_alarm.ps1"
+```
+
+An external scheduler such as OpenClaw cron or Windows Task Scheduler can call that wrapper. For true audible local-speaker alarms, keep the computer awake and use `session-to-song play` at trigger time.
 
 ## Outputs
 

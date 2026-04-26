@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import os
+import secrets
 import subprocess
 import sys
 import time
@@ -28,6 +29,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WEB_DIR = ROOT / "webui"
 WEB_OUTPUT_DIR = ROOT / "content" / "output" / "webui-latest"
 LATEST_AUDIO_PATH: Path | None = None
+WRITE_TOKEN = secrets.token_urlsafe(24)
 
 USES = ["alarm", "reminder", "celebrate"]
 
@@ -199,6 +201,29 @@ def _read_json_body(environ) -> dict:
     length = int(environ.get("CONTENT_LENGTH") or 0)
     raw = environ["wsgi.input"].read(length) if length else b"{}"
     return json.loads(raw.decode("utf-8") or "{}")
+
+
+def _is_safe_local_write(environ) -> bool:
+    token = environ.get("HTTP_X_S2S_TOKEN") or ""
+    if token != WRITE_TOKEN:
+        return False
+    host = (environ.get("HTTP_HOST") or "").split(":", 1)[0].lower()
+    origin = environ.get("HTTP_ORIGIN") or ""
+    if origin:
+        try:
+            origin_host = origin.split("//", 1)[1].split("/", 1)[0].split(":", 1)[0].lower()
+        except Exception:
+            return False
+        allowed = {host, "127.0.0.1", "localhost", "eheye", "100.126.49.109"}
+        if origin_host not in allowed:
+            return False
+    return True
+
+
+def _guard_write_endpoint(environ, start_response):
+    if _is_safe_local_write(environ):
+        return None
+    return _json(start_response, {"error": "forbidden", "detail": "Invalid local write token or origin."}, "403 Forbidden")
 
 
 def _serve_file(start_response, file_path: Path):
@@ -391,12 +416,15 @@ def _latest_audio_path() -> Path:
 
 def _handle_publish_alarm_slot(start_response, payload: dict):
     name = (payload.get("name") or "audio").strip()
-    path = _latest_audio_path() if name == "audio" else Path(payload.get("path") or "")
+    if name != "audio" or payload.get("path"):
+        return _json(start_response, {"error": "bad_file", "detail": "Web publish can only use the latest generated audio."}, "400 Bad Request")
+    path = _latest_audio_path()
     try:
         result = publish_alarm_slot(
             path,
             slot=(payload.get("slot") or "morning"),
             target_dir=(payload.get("target_dir") or None),
+            create=False,
         )
     except AlarmSlotError as exc:
         return _json(start_response, {"error": "alarm_slot_failed", "detail": str(exc)}, "500 Internal Server Error")
@@ -405,7 +433,9 @@ def _handle_publish_alarm_slot(start_response, payload: dict):
 
 def _handle_play_audio(start_response, payload: dict):
     name = (payload.get("name") or "audio").strip()
-    path = _latest_audio_path() if name == "audio" else Path(payload.get("path") or "")
+    if name != "audio" or payload.get("path"):
+        return _json(start_response, {"error": "bad_file", "detail": "Web playback can only use the latest generated audio."}, "400 Bad Request")
+    path = _latest_audio_path()
     try:
         result = play_audio(
             path,
@@ -498,6 +528,7 @@ def app(environ, start_response):
                 "source_modes": ["auto", "current_session", "recent_session", "manual"],
                 "durations": [30, 45, 60, 90, 180, 240],
                 "deliveries": ["save", "immediate", "scheduled", "milestone"],
+                "write_token": WRITE_TOKEN,
                 "audio_generation": {
                     "available": music_generation_available(user_config),
                     "provider": provider_status.music.provider,
@@ -528,6 +559,9 @@ def app(environ, start_response):
         )
 
     if path == "/api/generate" and method == "POST":
+        blocked = _guard_write_endpoint(environ, start_response)
+        if blocked is not None:
+            return blocked
         try:
             return _handle_generate(start_response, _read_json_body(environ))
         except Exception as exc:  # pragma: no cover - debug path
@@ -540,21 +574,33 @@ def app(environ, start_response):
         return _json(start_response, {"suggestions": alarm_slot_suggestions()})
 
     if path == "/api/generate-audio" and method == "POST":
+        blocked = _guard_write_endpoint(environ, start_response)
+        if blocked is not None:
+            return blocked
         try:
             return _handle_generate_audio(start_response, _read_json_body(environ))
         except Exception as exc:  # pragma: no cover - debug path
             return _json(start_response, {"error": "audio_generation_failed", "detail": str(exc)}, "500 Internal Server Error")
 
     if path == "/api/play-audio" and method == "POST":
+        blocked = _guard_write_endpoint(environ, start_response)
+        if blocked is not None:
+            return blocked
         try:
             return _handle_play_audio(start_response, _read_json_body(environ))
         except Exception as exc:  # pragma: no cover - debug path
             return _json(start_response, {"error": "playback_failed", "detail": str(exc)}, "500 Internal Server Error")
 
     if path == "/api/alarm-slot/pick-folder" and method == "POST":
+        blocked = _guard_write_endpoint(environ, start_response)
+        if blocked is not None:
+            return blocked
         return _handle_pick_alarm_slot_folder(start_response)
 
     if path == "/api/alarm-slot" and method == "POST":
+        blocked = _guard_write_endpoint(environ, start_response)
+        if blocked is not None:
+            return blocked
         try:
             return _handle_publish_alarm_slot(start_response, _read_json_body(environ))
         except Exception as exc:  # pragma: no cover - debug path
