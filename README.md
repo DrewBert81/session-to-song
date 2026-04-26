@@ -35,6 +35,8 @@ It is built around a simple product idea:
 - includes a `doctor` command for public-repo setup checks
 - writes a manifest for every run
 - can generate browser-playable audio from the localhost web UI when Google/Gemini, MiniMax, or Comfy music is configured
+- can play generated MP3s on the local computer for speaker/Bluetooth output
+- can publish a stable `S2S-morning.mp3` alarm-slot file into a local Drive/sync folder for Android Clock-style alarms
 
 ## Supported production path
 
@@ -258,6 +260,76 @@ The main supported UI path is:
 Use the optional **Project filter** field to scope the selected artifact use to a
 project, for example an alarm from only recent ExampleProject work.
 
+## Playback and alarm delivery
+
+### Preview/play on this computer
+
+After generating audio in the web UI, use the built-in audio player or click **Play on this computer**.
+On Windows this uses local playback so whatever Windows is currently routing audio to should be used. If a Bluetooth adapter/speaker such as BOT63 is connected and selected as the current output, the track should come out there.
+
+CLI equivalent:
+
+```bash
+session-to-song play content/output/webui-latest/generated_audio.mp3 --volume 100
+```
+
+Useful variants:
+
+```bash
+session-to-song play content/output/webui-latest/generated_audio.mp3 --backend powershell --volume 100
+session-to-song play content/output/webui-latest/generated_audio.mp3 --backend open --no-block
+```
+
+Backends are resolved in this order when `--backend auto` is used:
+1. Windows PowerShell MediaPlayer
+2. `ffplay`
+3. VLC
+4. default OS file opener
+
+### Android / Google Clock alarm slot
+
+The simplest phone-alarm MVP is a stable MP3 file that Android Clock points at once:
+
+```text
+My Drive/sessiontosong/alarms/S2S-morning.mp3
+```
+
+Recommended flow:
+1. Create/select `sessiontosong/alarms/S2S-morning.mp3` in My Drive from Android Clock.
+2. Generate the morning alarm in session-to-song.
+3. Click **Update phone alarm** in the web UI, or run the CLI command below.
+4. Google Drive sync updates the same file name, and Android Clock keeps using that slot.
+
+CLI equivalent:
+
+```bash
+session-to-song alarm-slot morning --file content/output/webui-latest/generated_audio.mp3 --target-dir "C:\Users\you\My Drive\sessiontosong\alarms"
+```
+
+You can avoid passing `--target-dir` every time by setting:
+
+```bash
+SESSION_TO_SONG_ALARM_SLOT_DIR="C:\Users\you\My Drive\sessiontosong\alarms"
+```
+
+Then:
+
+```bash
+session-to-song alarm-slot morning --file content/output/webui-latest/generated_audio.mp3
+```
+
+This path does **not** require Google OAuth. It writes to a local Drive-for-Desktop/sync folder and lets Google Drive handle sync. If Android Clock caches the old file on a device, re-select the file once or force Drive/media sync; the intended contract is stable filename, changing contents.
+
+### Wiring a nightly alarm
+
+The repo now has the pieces needed for a scheduled generated alarm:
+
+```text
+scheduled trigger -> generate alarm audio -> publish S2S-morning.mp3 -> Android Clock plays the stable slot
+```
+
+An external scheduler such as OpenClaw cron or Windows Task Scheduler can call the CLI once the desired generation command is chosen. For true audible local-speaker alarms, keep the computer awake and use `session-to-song play` at trigger time.
+
 ## Outputs
 
 Each run writes:
@@ -265,6 +337,7 @@ Each run writes:
 - `lyrics.txt`
 - `music_prompt.txt`
 - `run_manifest.json`
+- optionally `generated_audio.mp3`
 
 ## Product direction
 
