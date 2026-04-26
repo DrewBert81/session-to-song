@@ -147,6 +147,10 @@ def _looks_like_noise_line(text: str) -> bool:
         return True
     if re.search(r"[a-z]:\\|/users/|c:\\|https?://|\.html\b|\.json\b|\.py\b", lowered):
         return True
+    if re.search(r"\b(src|server|webui|tests|docs|scripts|content)/[^\s:]+\.(tsx|ts|jsx|js|py|md|css|json)\b", lowered):
+        return True
+    if re.search(r"\b[a-z0-9_-]+\.(tsx|ts|jsx|js|py|md|css|json):", lowered):
+        return True
     if any(token in lowered for token in [
         "caption:", "[hook]", "[verse]", "[intro]", "reference pulse",
         "celebrate track | genre=", "same lyrics as the last song", "crappy sessions info",
@@ -208,8 +212,15 @@ def _select_fact_lines(*texts: str, limit: int = 12) -> list[str]:
     return [line for _, line in scored[:limit]]
 
 
-def _normalize_fact_line(text: str) -> str:
+def _strip_technical_subject(text: str) -> str:
     cleaned = " ".join(text.split())
+    cleaned = re.sub(r"`?\b(?:src|server|webui|tests|docs|scripts|content)/[^\s`]+`?:\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"`?\b[a-z0-9_-]+\.(?:tsx|ts|jsx|js|py|md|css|json)`?:\s*", "", cleaned, flags=re.IGNORECASE)
+    return cleaned.strip(" -•\t")
+
+
+def _normalize_fact_line(text: str) -> str:
+    cleaned = _strip_technical_subject(" ".join(text.split()))
     replacements = {
         "session two songs": "session-to-song",
         "session two song": "session-to-song",

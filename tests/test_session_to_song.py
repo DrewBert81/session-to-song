@@ -162,6 +162,27 @@ Need to keep validating the new flow and tightening edge cases.
             self.assertNotIn("genre set", lowered)
             self.assertNotIn("edge cases", lowered)
 
+    def test_pipeline_strips_file_paths_from_alarm_lyrics(self) -> None:
+        sample = """
+src/components/sidebar.tsx: renamed chat framing toward rooms / ai boardroom and added one-click room templates.
+release-checklist.md marked startup smoke and audit export smoke checked.
+Next move is making the morning alarm play through the phone slot.
+""".strip()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "sample.txt"
+            path.write_text(sample, encoding="utf-8")
+            material = load_text_file_material(path)
+            user_config = load_user_config()
+            user_config.llm_provider = "byok"
+            request = resolve_run_request(user_config, RunRequest(use="alarm", genre="rap"))
+            with patch.dict(os.environ, {}, clear=True):
+                artifacts = build_from_material(material, user_config, request)
+            lowered = artifacts.lyrics.lower()
+            self.assertNotIn("src/components", lowered)
+            self.assertNotIn("sidebar.tsx", lowered)
+            self.assertNotIn("release-checklist.md", lowered)
+            self.assertIn("rooms", lowered)
+
     def test_genre_resolution_honors_project_then_use_then_default(self) -> None:
         user_config = load_user_config()
         user_config.genre_by_project["HeavyProject"] = "folk"

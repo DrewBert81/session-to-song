@@ -95,14 +95,22 @@ def synthesize_artifacts_via_llm(
     focus = (request.resolved_focus or "").strip()
     sound_reference = (request.sound_reference or "").strip()
     artifact_use = request.resolved_use
+    def clean_fact_for_writer(value: object) -> str:
+        line = " ".join(str(value).split())
+        line = re.sub(r"`?\b(?:src|server|webui|tests|docs|scripts|content)/[^\s`]+`?:\s*", "", line, flags=re.IGNORECASE)
+        line = re.sub(r"`?\b[a-z0-9_-]+\.(?:tsx|ts|jsx|js|py|md|css|json)`?:\s*", "", line, flags=re.IGNORECASE)
+        line = re.sub(r"\b[0-9a-f]{7,40}\b", "", line, flags=re.IGNORECASE)
+        line = re.sub(r"\s{2,}", " ", line).strip(" -•,.;")
+        return line
+
     cleaned_lines = []
     for bucket in (material.wins, material.blockers, material.next_actions):
         for item in bucket:
-            line = " ".join(str(item).split())
+            line = clean_fact_for_writer(item)
             if line and line not in cleaned_lines:
                 cleaned_lines.append(line)
     for item in material.metadata.get("decisions", []) if isinstance(material.metadata.get("decisions"), list) else []:
-        line = " ".join(str(item).split())
+        line = clean_fact_for_writer(item)
         if line and line not in cleaned_lines:
             cleaned_lines.append(line)
     facts_block = "\n".join(f"- {line}" for line in cleaned_lines[:8]) or "- No structured facts extracted; infer carefully from raw text."
@@ -145,6 +153,8 @@ Rules:
 - Do NOT mention internal product/tool/framework words unless the user explicitly wants them.
 - Avoid words like: OpenClaw, config, genre set, style set, generate, validate, edge cases, vertical slice, Python.
 - Rewrite technical notes into human language before writing lyrics.
+- Never include file paths, filenames, component names, commit hashes, markdown mojibake, or raw developer changelog syntax in lyrics.
+- If a fact contains a path like src/components/foo.tsx, ignore the path and sing only the human product change.
 - For rap specifically: write in bars with punch, compression, momentum, and at least light rhyme/internal rhythm. It should sound performable, not like a checklist.
 - For rap specifically: make it feel like a wake-up banger that makes the listener want to get up and finish the repo/project.
 - For rap specifically: prefer direct verbs, concrete nouns, short bars, and motivational lift over soft reflection.

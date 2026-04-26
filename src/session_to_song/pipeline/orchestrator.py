@@ -100,6 +100,8 @@ def _compress(line: str, max_words: int = 10) -> str:
 
 def _humanize_line(line: str) -> str:
     cleaned = " ".join(line.strip().split())
+    cleaned = re.sub(r"`?\b(?:src|server|webui|tests|docs|scripts|content)/[^\s`]+`?:\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"`?\b[a-z0-9_-]+\.(?:tsx|ts|jsx|js|py|md|css|json)`?:\s*", "", cleaned, flags=re.IGNORECASE)
     lowered = cleaned.lower()
     for old, new in HUMAN_REWRITES.items():
         lowered = lowered.replace(old, new)
