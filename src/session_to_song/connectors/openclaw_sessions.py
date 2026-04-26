@@ -4,7 +4,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from ..project_filter import filter_lines_for_project, project_matches
@@ -32,6 +32,8 @@ class SourceRequest:
     project: str | None = None
     lookback_hours: int = 36
     limit: int = 12
+    use: str | None = None
+    target_date: str | None = None
 
 
 def _openclaw_root() -> Path:
@@ -50,6 +52,27 @@ def _openclaw_workspace_root() -> Path:
     if explicit:
         return Path(explicit)
     return _openclaw_root() / "workspace"
+
+
+def _workspace_candidates() -> list[Path]:
+    candidates: list[Path] = []
+    explicit = os.getenv("SESSION_TO_SONG_OPENCLAW_WORKSPACE") or os.getenv("OPENCLAW_WORKSPACE")
+    if explicit:
+        candidates.append(Path(explicit))
+    home = _openclaw_root()
+    candidates.extend([
+        home / "workspace",
+        home / "workspace-Ehgent",
+    ])
+    seen: set[str] = set()
+    output: list[Path] = []
+    for candidate in candidates:
+        key = str(candidate.resolve()) if candidate.exists() else str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        output.append(candidate)
+    return output
 
 
 def _parse_timestamp(value: object) -> datetime | None:
@@ -245,31 +268,88 @@ def _read_text_limited(path: Path, max_chars: int = 300_000) -> str:
 
 
 def _curated_context_files() -> list[Path]:
-    workspace = _openclaw_workspace_root()
     candidates: list[Path] = []
-    roots = [
-        workspace / "knowledge-base" / "wiki" / "daily",
-        workspace / "knowledge-base" / "wiki" / "syntheses",
-        workspace / "knowledge-base" / "wiki" / "reports",
-        workspace / "knowledge-base" / "wiki" / "entities",
-        workspace / "knowledge-base" / "wiki" / "articles",
-        workspace / "knowledge-base" / "raw" / "sessions",
-        workspace / "memory",
-    ]
-    for root in roots:
-        if not root.exists():
-            continue
-        candidates.extend(path for path in root.glob("*.md") if path.is_file())
-        candidates.extend(path for path in root.glob("*.txt") if path.is_file())
-    return sorted(candidates, key=lambda path: path.stat().st_mtime, reverse=True)
+    for workspace in _workspace_candidates():
+        roots = [
+            workspace / "knowledge-base" / "wiki" / "daily",
+            workspace / "knowledge-base" / "wiki" / "syntheses",
+            workspace / "knowledge-base" / "wiki" / "reports",
+            workspace / "knowledge-base" / "wiki" / "entities",
+            workspace / "knowledge-base" / "wiki" / "articles",
+            workspace / "knowledge-base" / "raw" / "sessions",
+            workspace / "memory",
+        ]
+        for root in roots:
+            if not root.exists():
+                continue
+            candidates.extend(path for path in root.glob("*.md") if path.is_file())
+            candidates.extend(path for path in root.glob("*.txt") if path.is_file())
+    unique = {str(path.resolve()): path for path in candidates}
+    return sorted(unique.values(), key=lambda path: path.stat().st_mtime, reverse=True)
 
 
 def _relative_curated_label(path: Path) -> str:
-    workspace = _openclaw_workspace_root().resolve()
-    try:
-        return str(path.resolve().relative_to(workspace))
-    except Exception:
-        return path.name
+    for workspace in _workspace_candidates():
+        try:
+            return str(path.resolve().relative_to(workspace.resolve()))
+        except Exception:
+            continue
+    return path.name
+
+
+def _target_date(request: SourceRequest) -> datetime.date:
+    if request.target_date:
+        try:
+            return datetime.fromisoformat(request.target_date).date()
+        except ValueError:
+            pass
+    if (request.use or "").lower() == "alarm":
+        return (datetime.now() - timedelta(days=1)).date()
+    return datetime.now().date()
+
+
+def _date_labels(day) -> tuple[str, str]:
+    iso = day.isoformat()
+    pretty = f"{day.strftime('%B')} {day.day}, {day.year}"
+    return iso, pretty
+
+
+def _daily_context_files(day) -> list[Path]:
+    iso, _ = _date_labels(day)
+    candidates: list[Path] = []
+    for workspace in _workspace_candidates():
+        direct = [
+            workspace / "memory" / f"{iso}.md",
+            workspace / "knowledge-base" / "wiki" / "daily" / f"{iso}.md",
+            workspace / "knowledge-base" / "wiki" / "daily" / f"{iso}.txt",
+        ]
+        candidates.extend(path for path in direct if path.exists() and path.is_file())
+        wiki_daily = workspace / "knowledge-base" / "wiki" / "daily"
+        if wiki_daily.exists():
+            candidates.extend(path for path in wiki_daily.glob(f"*{iso}*.md") if path.is_file())
+    unique = {str(path.resolve()): path for path in candidates}
+    return list(unique.values())
+
+
+def _dream_files() -> list[Path]:
+    candidates: list[Path] = []
+    for workspace in _workspace_candidates():
+        candidates.append(workspace / "DREAMS.md")
+    unique = {str(path.resolve()): path for path in candidates if path.exists() and path.is_file()}
+    return list(unique.values())
+
+
+def _dream_entries_for_date(day) -> list[str]:
+    _, pretty = _date_labels(day)
+    entries: list[str] = []
+    for path in _dream_files():
+        text = _read_text_limited(path, max_chars=500_000)
+        if "<!-- openclaw:dreaming:diary:start -->" in text:
+            text = text.split("<!-- openclaw:dreaming:diary:start -->", 1)[1]
+        for chunk in [part.strip() for part in text.split("---") if part.strip()]:
+            if f"*{pretty}" in chunk or pretty in chunk:
+                entries.append(chunk)
+    return entries
 
 
 def _select_curated_file_lines(text: str, project: str | None, limit: int = 18) -> list[str]:
@@ -278,6 +358,58 @@ def _select_curated_file_lines(text: str, project: str | None, limit: int = 18) 
         raw_lines = filter_lines_for_project(raw_lines, project)
     selected = _select_meaningful_lines(raw_lines, limit)
     return [line for line in selected if line.strip()]
+
+
+def resolve_daily_dream_context_source(request: SourceRequest) -> ResolvedSource | None:
+    """Build the intended alarm source: dated wiki/memory first, dated dreams second.
+
+    For wake-up alarms, the valuable source is usually yesterday's durable
+    summary plus dream imagery. Raw sessions should only be fallback evidence
+    when that curated bundle is too thin.
+    """
+    if (request.use or "").lower() != "alarm" or request.mode not in {"auto", "recent_session"}:
+        return None
+    day = _target_date(request)
+    iso, pretty = _date_labels(day)
+    parts: list[str] = []
+    labels: list[str] = []
+    fact_count = 0
+    for path in _daily_context_files(day):
+        text = _read_text_limited(path, max_chars=350_000)
+        if not text.strip():
+            continue
+        selected = _select_curated_file_lines(text, request.project, limit=80)
+        if request.project and not selected:
+            continue
+        body = "\n".join(selected) if selected else text
+        fact_count += len([line for line in body.splitlines() if line.strip()])
+        label = _relative_curated_label(path)
+        labels.append(label)
+        parts.append(f"--- dated source: {label} ---\n{body}")
+    dream_entries = _dream_entries_for_date(day)
+    if dream_entries:
+        dream_text = "\n\n".join(dream_entries)[:8000]
+        labels.append(f"DREAMS.md:{pretty}")
+        parts.append(f"--- dream source: DREAMS.md {pretty} ---\n{dream_text}")
+    if not parts:
+        return None
+    combined_text = "\n\n".join(parts)
+    # Require enough non-dream factual material before blocking raw-session fallback.
+    if fact_count < 2 and len(dream_entries) == 0:
+        return None
+    return ResolvedSource(
+        mode="curated_daily_dreams",
+        session_key=None,
+        session_id=None,
+        label=labels[0] + (f" (+{len(labels) - 1} more)" if len(labels) > 1 else ""),
+        project=request.project,
+        started_at=f"{iso}T00:00:00",
+        ended_at=f"{iso}T23:59:59",
+        score=1.0,
+        reason="dated wiki/memory plus dreams for alarm" + (", project scoped" if request.project else ""),
+        raw_text=combined_text,
+        preview=build_preview(combined_text),
+    )
 
 
 def resolve_curated_context_source(request: SourceRequest) -> ResolvedSource | None:
@@ -503,9 +635,13 @@ def score_session_candidate(session: dict, transcript: str, project: str | None 
 def resolve_best_session_source(request: SourceRequest) -> ResolvedSource | None:
     # Source ladder:
     # 1) explicit session_key/current session -> raw session path by user intent
-    # 2) curated OpenClaw wiki/memory/session digests -> cleaner default
-    # 3) raw JSONL session transcripts -> evidence fallback
+    # 2) alarm auto: dated wiki/memory + dreams -> wake-up source of truth
+    # 3) curated OpenClaw wiki/memory/session digests -> cleaner default
+    # 4) raw JSONL session transcripts -> evidence fallback
     if not request.session_key and request.mode in {"auto", "recent_session"}:
+        daily_dreams = resolve_daily_dream_context_source(request)
+        if daily_dreams and daily_dreams.score >= 0.55:
+            return daily_dreams
         curated = resolve_curated_context_source(request)
         if curated and curated.score >= 0.55:
             return curated

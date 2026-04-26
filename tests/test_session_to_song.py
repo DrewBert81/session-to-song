@@ -410,9 +410,7 @@ Need to keep validating the new flow and tightening edge cases.
                 }
             }
             (sessions_dir / "sessions.json").write_text(json.dumps(registry), encoding="utf-8")
-            old = os.environ.get("OPENCLAW_HOME")
-            os.environ["OPENCLAW_HOME"] = str(root)
-            try:
+            with patch.dict(os.environ, {"OPENCLAW_HOME": str(root), "SESSION_TO_SONG_OPENCLAW_WORKSPACE": "", "OPENCLAW_WORKSPACE": ""}, clear=False):
                 source = resolve_best_session_source(SourceRequest(mode="auto", project="session-to-song"))
                 self.assertIsNotNone(source)
                 assert source is not None
@@ -420,11 +418,27 @@ Need to keep validating the new flow and tightening edge cases.
                 material = extract_material_from_session(source)
                 self.assertIn("Built the automatic session source", material.raw_text)
                 self.assertTrue(material.wins)
-            finally:
-                if old is None:
-                    os.environ.pop("OPENCLAW_HOME", None)
-                else:
-                    os.environ["OPENCLAW_HOME"] = old
+
+    def test_alarm_auto_source_prefers_dated_memory_and_dreams(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            workspace = Path(tmp) / "workspace"
+            memory_dir = workspace / "memory"
+            memory_dir.mkdir(parents=True)
+            (memory_dir / "2026-04-25.md").write_text(
+                "# 2026-04-25\n\n- Session-to-song fixed the alarm source ladder.\n- Next session-to-song move is validating yesterday plus dreams.\n",
+                encoding="utf-8",
+            )
+            (workspace / "DREAMS.md").write_text(
+                "# Dream Diary\n\n<!-- openclaw:dreaming:diary:start -->\n---\n\n*April 25, 2026 at 3:02 AM CST*\n\nA gateway opened beside a boardroom full of lanterns.\n",
+                encoding="utf-8",
+            )
+            with patch.dict(os.environ, {"SESSION_TO_SONG_OPENCLAW_WORKSPACE": str(workspace)}, clear=False):
+                source = resolve_best_session_source(SourceRequest(mode="auto", project="session-to-song", use="alarm", target_date="2026-04-25"))
+            self.assertIsNotNone(source)
+            assert source is not None
+            self.assertEqual(source.mode, "curated_daily_dreams")
+            self.assertIn("alarm source ladder", source.raw_text.lower())
+            self.assertIn("boardroom full of lanterns", source.raw_text.lower())
 
     def test_auto_source_prefers_curated_openclaw_context(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

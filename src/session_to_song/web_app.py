@@ -277,6 +277,7 @@ def _handle_generate(start_response, payload: dict):
                 session_key=request.source_session_key,
                 project=request.project,
                 lookback_hours=int(request.lookback_hours or default_lookback),
+                use=request.resolved_use,
             )
         )
         if resolved_source is None:
@@ -322,6 +323,8 @@ def _handle_resolve_source(start_response, params: dict[str, list[str]]):
             session_key=session_key,
             project=project,
             lookback_hours=lookback_hours,
+            use=(params.get("use") or [None])[0],
+            target_date=(params.get("target_date") or [None])[0],
         )
     )
     if source is None:
