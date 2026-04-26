@@ -218,6 +218,23 @@ Project-scoped OpenClaw session run:
 session-to-song generate --source auto --use alarm --project ExampleProject --outdir content/output/exampleproject-alarm
 ```
 
+## How it works with someone else's OpenClaw
+
+On another machine, `session-to-song` reads that user's own local OpenClaw session registry under:
+
+```text
+~/.openclaw/agents/*/sessions/sessions.json
+```
+
+Those registry files point to that user's local session JSONL transcripts. Nothing from this repo ships with Drew's sessions, keys, outputs, or memory. If OpenClaw has recent sessions, `--source auto` and the web UI's one-click flow pick high-signal recent work. If the user adds a project filter, the resolver biases toward sessions and lines matching that project and filters out unrelated session noise.
+
+Expected public behavior:
+- **No OpenClaw sessions yet:** text/file input still works, and `--source auto` fails clearly with `No recent session source found.`
+- **OpenClaw sessions exist:** auto mode creates pulse/lyrics/music prompt from the user's own recent sessions.
+- **Project filter set:** auto mode narrows to project-relevant session material instead of generic recent chatter.
+- **No API keys:** template text artifacts still work.
+- **LLM/music keys present:** live text/audio providers can improve the artifacts and generate audio.
+
 ## Localhost web UI
 
 Run the web UI from the repo root:
@@ -230,7 +247,7 @@ Then open `http://127.0.0.1:8311`.
 
 The main supported UI path is:
 1. generate text artifacts
-2. optionally generate audio if Google/Gemini music is configured
+2. optionally generate audio if Google/Gemini, MiniMax, or Comfy music is configured
 
 Use the optional **Project filter** field to scope the selected artifact use to a
 project, for example an alarm from only recent ExampleProject work.
