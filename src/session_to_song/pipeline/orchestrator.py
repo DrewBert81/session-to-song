@@ -9,6 +9,9 @@ from ..providers import detect_provider_status, llm_artifact_synthesis_available
 STOPWORDS = {
     "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "from", "in", "into", "is", "it",
     "of", "on", "or", "that", "the", "to", "up", "was", "we", "were", "with", "today", "this", "our",
+    "openclaw", "session", "sessions", "song", "songs", "session-to-song", "product", "curated", "recent",
+    "commits", "commit", "github", "repo", "memory", "source", "sources", "what", "should", "focus",
+    "project", "build", "built", "drew", "mode", "style", "use", "angle", "copy", "labels",
 }
 
 JARGON_PATTERNS = [
@@ -36,6 +39,8 @@ HUMAN_REWRITES = {
     "tightening edge cases": "cleaning up the rough edges",
     "vertical slice": "working version",
     "web flow": "the experience",
+    "drew approved": "build mode was approved",
+    "drew identified": "the product copy showed",
 }
 
 USE_HELPERS = {
@@ -72,7 +77,16 @@ def _top_keywords(text: str, limit: int = 6) -> list[str]:
     return [word for word, _ in ranked[:limit]]
 
 
+def _strip_commit_noise(line: str) -> str:
+    cleaned = re.sub(r"\b[0-9a-f]{7,40}\b", "", line, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\brecent commits?:?\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b(feat|fix|docs|chore|refactor|test):\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s*\|\s*", ", ", cleaned)
+    return re.sub(r"\s{2,}", " ", cleaned).strip(" ,.-") or line
+
+
 def _compress(line: str, max_words: int = 10) -> str:
+    line = _strip_commit_noise(line)
     words = line.split()
     clipped = words[:max_words]
     if len(words) > max_words:
@@ -86,6 +100,7 @@ def _humanize_line(line: str) -> str:
     for old, new in HUMAN_REWRITES.items():
         lowered = lowered.replace(old, new)
     cleaned = lowered
+    cleaned = _strip_commit_noise(cleaned)
     for pattern in JARGON_PATTERNS:
         cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" ,.-")
@@ -106,6 +121,8 @@ def _best_lines(material: SessionMaterial, limit: int = 4) -> list[str]:
 
 def _focus_line(focus: str | None) -> str | None:
     if not focus:
+        return None
+    if re.match(r"(?i)^\s*(sound reference|artist style)\s*:", focus):
         return None
     return _compress(focus.strip().rstrip("?"), 12)
 
@@ -214,11 +231,13 @@ def build_lyrics(material: SessionMaterial, pulse: str, request: RunRequest, sty
 
 def build_music_prompt(material: SessionMaterial, lyrics: str, request: RunRequest, style: StylePreset) -> str:
     focus = request.resolved_focus
+    sound_reference = (request.sound_reference or "").strip()
     use = request.resolved_use
     keyword_source = material.raw_text + (f"\n{focus}" if focus else "")
     keywords = ", ".join(_top_keywords(keyword_source)) or "focused work"
     project_phrase = f" for project {material.project}" if material.project else ""
-    focus_phrase = f" Focus: {focus}. Treat it as the main emphasis, not a footnote." if focus else ""
+    focus_phrase = f" Focus: {focus}. Treat it as the main emphasis, not a footnote." if _focus_line(focus) else ""
+    sound_phrase = f" Sound reference: {sound_reference}. Treat this as sound design only; do not make it the lyrical subject." if sound_reference else ""
     use_phrase = USE_HELPERS.get(use, USE_HELPERS["alarm"])["music"]
     duration_seconds = request.duration_seconds or 45
     factual_lines = []
@@ -236,7 +255,7 @@ def build_music_prompt(material: SessionMaterial, lyrics: str, request: RunReque
         f"Use guidance: {use_phrase} "
         f"Theme keywords: {keywords}."
         f"{fact_block}"
-        f"{focus_phrase} "
+        f"{focus_phrase}{sound_phrase} "
         "Keep it catchy, short, PG, and suitable for chat delivery. Use these lyrics as the backbone:\n\n"
         f"{lyrics}\n\n"
         "End with a clean sting, not a long fade."
@@ -309,5 +328,6 @@ def build_from_material(material: SessionMaterial, user_config: UserConfig, requ
         "mode": request.mode,
         "style": request.style,
         "question": request.question,
+        "sound_reference": request.sound_reference,
     }
     return SongArtifacts(pulse=pulse, lyrics=lyrics, music_prompt=music_prompt, manifest=manifest)

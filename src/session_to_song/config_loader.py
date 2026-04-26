@@ -95,6 +95,7 @@ def resolve_run_request(user_config: UserConfig, request: RunRequest) -> RunRequ
         use=request.resolved_use,
         genre=resolve_genre(user_config, request),
         focus=request.resolved_focus,
+        sound_reference=request.sound_reference,
         delivery=request.delivery or user_config.delivery,
         duration_seconds=request.duration_seconds or user_config.duration_seconds,
         input_source=request.input_source,

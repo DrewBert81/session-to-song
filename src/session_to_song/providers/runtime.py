@@ -93,6 +93,7 @@ def synthesize_artifacts_via_llm(
     fallback_music_prompt: str,
 ) -> dict[str, str]:
     focus = (request.resolved_focus or "").strip()
+    sound_reference = (request.sound_reference or "").strip()
     artifact_use = request.resolved_use
     cleaned_lines = []
     for bucket in (material.wins, material.blockers, material.next_actions):
@@ -118,7 +119,8 @@ Return ONLY valid JSON with this exact shape:
 }}
 
 Rules:
-- Make the output materially reflect the user's focus, UNLESS the focus is purely an "Artist style" or "Sound reference", in which case rely entirely on the structured facts for lyrics.
+- Make the output materially reflect the user's focus.
+- Treat Sound reference as sound design only; do not make it the lyrical subject.
 - Do not just restate the same template with swapped nouns.
 - Keep it concise, high-signal, and specific to the source text.
 - Name concrete achievements, changes, fixes, decisions, or next moves from the source. Avoid vague lines like "we moved forward" or "momentum is real" unless paired with specifics.
@@ -137,7 +139,7 @@ Rules:
 - The lyrics field may be spoken-word / structured lines, not necessarily a song chorus.
 - The music_prompt should be usable as a generation prompt and should mention the focus explicitly.
 - If the focus mentions a specific artist or real person, describe their musical style and instruments in the music_prompt rather than naming them directly, to avoid triggering copyright safety filters.
-- If the User focus specifies an "Artist style" or "Sound reference", it should OVERRIDE the default Genre sound. The music_prompt MUST be heavily tailored to that sound's vibe and instrumentation without naming specific real artists.
+- If Sound reference is present, it should OVERRIDE the default Genre sound. The music_prompt MUST be heavily tailored to that sound's vibe and instrumentation without naming specific real artists.
 - Start the lyrics with a creative, AI-generated title block (e.g. `[<Creative Title> | genre={style.key}]`). Do NOT just echo the raw title or focus.
 - Write a custom, punchy intro line. Do not use generic filler.
 - The lyrics must open immediately with content; no slow intro, no scene-setting fluff, no empty hype.
@@ -157,6 +159,9 @@ Artifact use:
 
 User focus:
 {focus or '(none)'}
+
+Sound reference:
+{sound_reference or '(none)'}
 
 Genre:
 - key: {style.key}

@@ -247,6 +247,7 @@ def _handle_generate(start_response, payload: dict):
             use=payload.get("use") or None,
             genre=payload.get("genre") or None,
             focus=payload.get("focus") or None,
+            sound_reference=payload.get("sound_reference") or None,
             delivery=(payload.get("delivery") or None),
             duration_seconds=payload.get("duration_seconds") or None,
             input_source=payload.get("input_source") or "text",

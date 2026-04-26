@@ -70,6 +70,7 @@ class RunRequest:
     use: ArtifactUse | None = None
     genre: Genre | None = None
     focus: str | None = None
+    sound_reference: str | None = None
     delivery: DeliveryMode | None = None
     duration_seconds: int | None = None
     input_source: str = "text"

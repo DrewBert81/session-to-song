@@ -137,7 +137,7 @@ def _looks_like_noise_line(text: str) -> bool:
         return True
     if len(lowered.split()) < 4:
         return True
-    if len(lowered.split()) > 40:
+    if len(lowered.split()) > 55:
         return True
     if lowered.startswith("#") or lowered.startswith("[") or lowered.startswith("```"):
         return True
@@ -151,6 +151,7 @@ def _looks_like_noise_line(text: str) -> bool:
         "caption:", "[hook]", "[verse]", "[intro]", "reference pulse",
         "celebrate track | genre=", "same lyrics as the last song", "crappy sessions info",
         "fully untracked in git status, so i did not commit", "repo still has no remote configured",
+        "working tree has", "pending file change", "initial git commit created",
         "open: http", "running locally", "started it from", "status check", "keys present", "web app running",
         "toolresult", "non-text content", "backenddomnodeid", "fullscreenelement",
         "current url", "mockup", "dream recap track", "track opens with", "send me",
@@ -161,7 +162,7 @@ def _looks_like_noise_line(text: str) -> bool:
         return True
     if lowered.startswith("if ") or lowered.startswith("2)") or lowered.startswith("3)"):
         return True
-    if text.count("`") >= 2:
+    if text.count("`") >= 4 or re.search(r"`[^`]*(?:[\\/]|\.py|\.json|\.md|\.html)[^`]*`", text):
         return True
     weird = len(re.findall(r"[^\w\s,.!?':;()-]", text))
     if weird > max(6, len(text) // 12):
@@ -180,7 +181,7 @@ def _split_fact_candidates(text: str) -> list[str]:
             continue
         parts = re.split(r"(?<=[.!?])\s+", line)
         for part in parts:
-            part = part.strip(" -•\t")
+            part = part.strip(" -•\t").replace("`", "")
             if len(part.split()) < 4:
                 continue
             if _looks_like_noise_line(part):
