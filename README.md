@@ -15,7 +15,10 @@ It is built around a simple product idea:
 
 Sample celebration track from a real session-to-song run:
 
-- [`session-to-song-commit.mp3`](content/examples/audio/session-to-song-commit.mp3)
+- [Play/download the MP3 directly](https://raw.githubusercontent.com/DrewBert81/session-to-song/master/content/examples/audio/session-to-song-commit.mp3)
+- Repo file: [`session-to-song-commit.mp3`](content/examples/audio/session-to-song-commit.mp3)
+
+GitHub's file viewer may not show an audio player for MP3 files. Use the direct raw link above, or right-click/save the repo file.
 
 This is the concrete loop: ship work, turn the session into lyrics/music prompt/audio, then hear the milestone back as a short celebration.
 
