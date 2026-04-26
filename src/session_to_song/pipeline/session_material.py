@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -90,6 +91,13 @@ def load_recent_dream_context(limit_entries: int = 2, dreams_path: Path | None =
 
 
 def _workspace_root() -> Path:
+    explicit = os.getenv("SESSION_TO_SONG_OPENCLAW_WORKSPACE") or os.getenv("OPENCLAW_WORKSPACE")
+    if explicit:
+        return Path(explicit)
+    openclaw_home = Path(os.getenv("OPENCLAW_HOME", str(Path.home() / ".openclaw")))
+    workspace = openclaw_home / "workspace"
+    if workspace.exists():
+        return workspace
     return Path(__file__).resolve().parents[4]
 
 
@@ -142,7 +150,7 @@ def _looks_like_noise_line(text: str) -> bool:
     if any(token in lowered for token in [
         "caption:", "[hook]", "[verse]", "[intro]", "reference pulse",
         "celebrate track | genre=", "same lyrics as the last song", "crappy sessions info",
-        "fully untracked in git status, so i did not commit",
+        "fully untracked in git status, so i did not commit", "repo still has no remote configured",
         "open: http", "running locally", "started it from", "status check", "keys present", "web app running",
         "toolresult", "non-text content", "backenddomnodeid", "fullscreenelement",
         "current url", "mockup", "dream recap track", "track opens with", "send me",

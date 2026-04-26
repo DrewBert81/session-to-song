@@ -408,6 +408,32 @@ Need to keep validating the new flow and tightening edge cases.
                 else:
                     os.environ["OPENCLAW_HOME"] = old
 
+    def test_auto_source_prefers_curated_openclaw_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / ".openclaw"
+            workspace = root / "workspace"
+            wiki_dir = workspace / "knowledge-base" / "wiki" / "daily"
+            wiki_dir.mkdir(parents=True)
+            (wiki_dir / "2026-04-23.md").write_text(
+                "# Daily\n\nExampleProject shipped the curated session summary path.\nNext ExampleProject step is validating the memory-first source ladder.\n",
+                encoding="utf-8",
+            )
+            sessions_dir = root / "agents" / "founders" / "sessions"
+            sessions_dir.mkdir(parents=True)
+            session_file = sessions_dir / "demo.jsonl"
+            session_file.write_text(
+                json.dumps({"type": "message", "message": {"role": "user", "content": [{"type": "text", "text": "ExampleProject raw transcript was noisier."}]}}),
+                encoding="utf-8",
+            )
+            (sessions_dir / "sessions.json").write_text(json.dumps({"demo": {"updatedAt": 9999999999999, "sessionFile": str(session_file)}}), encoding="utf-8")
+            with patch.dict(os.environ, {"OPENCLAW_HOME": str(root)}, clear=False):
+                source = resolve_best_session_source(SourceRequest(mode="auto", project="ExampleProject"))
+            self.assertIsNotNone(source)
+            assert source is not None
+            self.assertEqual(source.mode, "curated_context")
+            self.assertIn("curated session summary", source.raw_text.lower())
+            self.assertNotIn("raw transcript was noisier", source.raw_text.lower())
+
     def test_session_fetch_prefers_meaningful_lines_over_tail_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / ".openclaw"
@@ -485,13 +511,8 @@ Need to keep validating the new flow and tightening edge cases.
                 "# 2026-04-23\n\n- **Decision:** Auto-source should use session plus memory.\n- **Status:** Fixed the generic lyrics path.\nnoise\n",
                 encoding="utf-8",
             )
-            import session_to_song.pipeline.session_material as session_material
-            old_file = session_material.__file__
-            try:
-                session_material.__file__ = str(workspace / "session-to-song" / "src" / "session_to_song" / "pipeline" / "session_material.py")
+            with patch.dict(os.environ, {"SESSION_TO_SONG_OPENCLAW_WORKSPACE": str(workspace)}, clear=False):
                 text = load_recent_memory_context()
-            finally:
-                session_material.__file__ = old_file
             self.assertIn("Auto-source should use session plus memory", text)
             self.assertIn("Fixed the generic lyrics path", text)
 
@@ -534,13 +555,8 @@ Next session-to-song step is fixing source-to-facts extraction so the wake-up tr
                 "preview": "demo preview",
                 "started_at": "2026-04-23T18:00:00Z",
             })()
-            import session_to_song.pipeline.session_material as session_material
-            old_file = session_material.__file__
-            try:
-                session_material.__file__ = str(workspace / "session-to-song" / "src" / "session_to_song" / "pipeline" / "session_material.py")
+            with patch.dict(os.environ, {"SESSION_TO_SONG_OPENCLAW_WORKSPACE": str(workspace)}, clear=False):
                 material = extract_material_from_session(source)
-            finally:
-                session_material.__file__ = old_file
             self.assertIn("Structured session facts", material.raw_text)
             self.assertIn("cut the long intro", material.raw_text.lower())
             self.assertIn("fact-lock", material.raw_text.lower())
@@ -594,13 +610,8 @@ Session-to-song added project-scoped alarm sourcing.
                 "preview": "demo preview",
                 "started_at": "2026-04-23T18:00:00Z",
             })()
-            import session_to_song.pipeline.session_material as session_material
-            old_file = session_material.__file__
-            try:
-                session_material.__file__ = str(workspace / "session-to-song" / "src" / "session_to_song" / "pipeline" / "session_material.py")
+            with patch.dict(os.environ, {"SESSION_TO_SONG_OPENCLAW_WORKSPACE": str(workspace)}, clear=False):
                 material = extract_material_from_session(source)
-            finally:
-                session_material.__file__ = old_file
             self.assertIn("session-to-song", material.raw_text.lower())
             self.assertNotIn("otherproject", material.raw_text.lower())
 

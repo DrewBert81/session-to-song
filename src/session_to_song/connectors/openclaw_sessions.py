@@ -45,6 +45,13 @@ def _session_registry_files() -> list[Path]:
     return list(root.glob("*/sessions/sessions.json"))
 
 
+def _openclaw_workspace_root() -> Path:
+    explicit = os.getenv("SESSION_TO_SONG_OPENCLAW_WORKSPACE") or os.getenv("OPENCLAW_WORKSPACE")
+    if explicit:
+        return Path(explicit)
+    return _openclaw_root() / "workspace"
+
+
 def _parse_timestamp(value: object) -> datetime | None:
     if not value:
         return None
@@ -229,6 +236,126 @@ def _project_context_lines(lines: list[str], project: str | None, context: int =
     return [line for idx, line in enumerate(lines) if idx in selected_indexes]
 
 
+def _read_text_limited(path: Path, max_chars: int = 300_000) -> str:
+    try:
+        with path.open("r", encoding="utf-8", errors="ignore") as handle:
+            return handle.read(max_chars)
+    except Exception:
+        return ""
+
+
+def _curated_context_files() -> list[Path]:
+    workspace = _openclaw_workspace_root()
+    candidates: list[Path] = []
+    roots = [
+        workspace / "knowledge-base" / "wiki" / "daily",
+        workspace / "knowledge-base" / "wiki" / "syntheses",
+        workspace / "knowledge-base" / "wiki" / "reports",
+        workspace / "knowledge-base" / "wiki" / "entities",
+        workspace / "knowledge-base" / "wiki" / "articles",
+        workspace / "knowledge-base" / "raw" / "sessions",
+        workspace / "memory",
+    ]
+    for root in roots:
+        if not root.exists():
+            continue
+        candidates.extend(path for path in root.glob("*.md") if path.is_file())
+        candidates.extend(path for path in root.glob("*.txt") if path.is_file())
+    return sorted(candidates, key=lambda path: path.stat().st_mtime, reverse=True)
+
+
+def _relative_curated_label(path: Path) -> str:
+    workspace = _openclaw_workspace_root().resolve()
+    try:
+        return str(path.resolve().relative_to(workspace))
+    except Exception:
+        return path.name
+
+
+def _select_curated_file_lines(text: str, project: str | None, limit: int = 18) -> list[str]:
+    raw_lines = [line.strip(" -•\t") for line in text.splitlines() if line.strip()]
+    if project:
+        raw_lines = filter_lines_for_project(raw_lines, project)
+    selected = _select_meaningful_lines(raw_lines, limit)
+    return [line for line in selected if line.strip()]
+
+
+def resolve_curated_context_source(request: SourceRequest) -> ResolvedSource | None:
+    """Resolve summarized OpenClaw context before falling back to raw JSONL sessions.
+
+    Modern OpenClaw installs often maintain wiki pages, daily summaries, and
+    archived session digests. Those are cleaner song inputs than raw transcripts.
+    This resolver reads only local user-owned files under the user's OpenClaw
+    workspace and never requires Drew's data or a hosted service.
+    """
+    files = _curated_context_files()
+    if not files:
+        return None
+    now_ms = datetime.now(tz=UTC).timestamp() * 1000
+    min_mtime_ms = now_ms - (request.lookback_hours * 3600 * 1000)
+    rows: list[tuple[float, Path, list[str]]] = []
+    for path in files[:80]:
+        try:
+            mtime_ms = path.stat().st_mtime * 1000
+        except Exception:
+            continue
+        # Keep project matches even if older; otherwise respect the lookback.
+        text = _read_text_limited(path)
+        if not text.strip():
+            continue
+        label = _relative_curated_label(path)
+        project_hit = bool(request.project and (project_matches(label, request.project) or project_matches(text, request.project)))
+        if mtime_ms < min_mtime_ms and not project_hit:
+            continue
+        lines = _select_curated_file_lines(text, request.project, limit=18)
+        if request.project and not lines:
+            continue
+        if not request.project and not lines:
+            continue
+        age_hours = max(0.0, (now_ms - mtime_ms) / 3600000)
+        recency_score = max(0.0, 1.0 - min(age_hours / max(request.lookback_hours, 1), 1.0))
+        path_lower = label.lower()
+        source_boost = 0.0
+        if "wiki" in path_lower:
+            source_boost += 0.18
+        if "syntheses" in path_lower or "reports" in path_lower:
+            source_boost += 0.12
+        if "raw" in path_lower and "sessions" in path_lower:
+            source_boost += 0.08
+        project_boost = 0.25 if project_hit else 0.0
+        signal = min(sum(_message_signal_score(line) for line in lines[:8]) / 10.0, 0.35)
+        score = min(1.0, 0.35 + recency_score * 0.25 + source_boost + project_boost + signal)
+        rows.append((score, path, lines[:18]))
+    if not rows:
+        return None
+    rows.sort(key=lambda item: item[0], reverse=True)
+    selected = rows[: min(4, max(1, request.limit // 3))]
+    parts: list[str] = []
+    labels: list[str] = []
+    for _, path, lines in selected:
+        label = _relative_curated_label(path)
+        labels.append(label)
+        parts.append(f"--- curated source: {label} ---\n" + "\n".join(lines))
+    combined_text = "\n\n".join(parts)
+    best_score = selected[0][0]
+    reason = "curated OpenClaw memory/wiki/session digest"
+    if request.project:
+        reason += ", project match"
+    return ResolvedSource(
+        mode="curated_context",
+        session_key=None,
+        session_id=None,
+        label=labels[0] + (f" (+{len(labels) - 1} more)" if len(labels) > 1 else ""),
+        project=request.project,
+        started_at=None,
+        ended_at=None,
+        score=round(best_score, 3),
+        reason=reason,
+        raw_text=combined_text,
+        preview=build_preview(combined_text),
+    )
+
+
 def list_candidate_sessions(project: str | None = None, lookback_hours: int = 36, limit: int = 12) -> list[dict]:
     now_ms = datetime.now(tz=UTC).timestamp() * 1000
     min_updated_ms = now_ms - (lookback_hours * 3600 * 1000)
@@ -374,6 +501,15 @@ def score_session_candidate(session: dict, transcript: str, project: str | None 
 
 
 def resolve_best_session_source(request: SourceRequest) -> ResolvedSource | None:
+    # Source ladder:
+    # 1) explicit session_key/current session -> raw session path by user intent
+    # 2) curated OpenClaw wiki/memory/session digests -> cleaner default
+    # 3) raw JSONL session transcripts -> evidence fallback
+    if not request.session_key and request.mode in {"auto", "recent_session"}:
+        curated = resolve_curated_context_source(request)
+        if curated and curated.score >= 0.55:
+            return curated
+
     candidates = list_candidate_sessions(project=request.project, lookback_hours=request.lookback_hours, limit=request.limit)
     if request.session_key:
         candidates = [candidate for candidate in candidates if candidate["session_key"] == request.session_key] or candidates

@@ -229,11 +229,17 @@ On another machine, `session-to-song` reads that user's own local OpenClaw sessi
 Those registry files point to that user's local session JSONL transcripts. Nothing from this repo ships with Drew's sessions, keys, outputs, or memory. If OpenClaw has recent sessions, `--source auto` and the web UI's one-click flow pick high-signal recent work. If the user adds a project filter, the resolver biases toward sessions and lines matching that project and filters out unrelated session noise.
 
 Expected public behavior:
+- **Curated OpenClaw context exists:** auto mode prefers local wiki, memory, and archived session digests because they are cleaner than raw transcripts.
+- **Only raw OpenClaw sessions exist:** auto mode falls back to the user's own recent JSONL session transcripts and filters/scopes them.
 - **No OpenClaw sessions yet:** text/file input still works, and `--source auto` fails clearly with `No recent session source found.`
-- **OpenClaw sessions exist:** auto mode creates pulse/lyrics/music prompt from the user's own recent sessions.
-- **Project filter set:** auto mode narrows to project-relevant session material instead of generic recent chatter.
+- **Project filter set:** auto mode narrows to project-relevant memory/wiki/session material instead of generic recent chatter.
 - **No API keys:** template text artifacts still work.
 - **LLM/music keys present:** live text/audio providers can improve the artifacts and generate audio.
+
+Source ladder for `--source auto`:
+1. local OpenClaw curated context: `workspace/knowledge-base/wiki`, `workspace/knowledge-base/raw/sessions`, and `workspace/memory`
+2. raw OpenClaw session registry/transcripts: `agents/*/sessions/sessions.json` + JSONL session files
+3. explicit text/file input when auto-source is unavailable or the user wants exact control
 
 ## Localhost web UI
 
