@@ -403,15 +403,18 @@ function useSuggestedAlarmDir(kind) {
 }
 
 async function pickAlarmFolder() {
-  if (!window.showDirectoryPicker) {
-    els.alarmSlotHint.textContent = 'This browser cannot expose folder paths. Use Google Drive/iCloud suggestion or paste the local sync folder path.';
-    return;
-  }
+  els.alarmSlotHint.textContent = 'Opening folder picker on the OpenClaw host…';
   try {
-    await window.showDirectoryPicker({ mode: 'readwrite' });
-    els.alarmSlotHint.textContent = 'Folder picked, but browsers hide the real filesystem path. Paste the local sync folder path so the server can write S2S-morning.mp3.';
+    const res = await fetch('/api/alarm-slot/pick-folder', { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || data.error || 'Folder picker failed');
+    if (data.cancelled) {
+      els.alarmSlotHint.textContent = 'Folder selection cancelled.';
+      return;
+    }
+    setAlarmSlotDir(data.path, 'Selected folder');
   } catch (e) {
-    els.alarmSlotHint.textContent = 'Folder selection cancelled.';
+    els.alarmSlotHint.textContent = `Could not open native picker: ${e.message}. Paste the local sync folder path or use a shortcut.`;
   }
 }
 

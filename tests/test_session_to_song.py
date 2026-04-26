@@ -378,6 +378,13 @@ Need to keep validating the new flow and tightening edge cases.
             self.assertEqual(result.filename, "S2S-morning.mp3")
             self.assertEqual((target_dir / "S2S-morning.mp3").read_bytes(), b"new alarm audio")
 
+    def test_web_alarm_slot_native_picker_endpoint_returns_selected_path(self) -> None:
+        completed = type("Completed", (), {"returncode": 0, "stdout": "C:\\Users\\Owner\\My Drive\\sessiontosong\\alarms\n", "stderr": ""})()
+        with patch("session_to_song.web_app.sys.platform", "win32"), patch("session_to_song.web_app.subprocess.run", return_value=completed):
+            status, _, payload = self._call_wsgi("/api/alarm-slot/pick-folder", method="POST")
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(payload["path"], "C:\\Users\\Owner\\My Drive\\sessiontosong\\alarms")
+
     def test_web_alarm_slot_suggestions_endpoint_lists_drive_targets(self) -> None:
         status, _, payload = self._call_wsgi("/api/alarm-slot/suggestions")
         self.assertEqual(status, "200 OK")

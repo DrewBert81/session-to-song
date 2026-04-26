@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import mimetypes
 import os
+import subprocess
+import sys
 import time
 from pathlib import Path
 from urllib import request as urllib_request
@@ -350,6 +352,38 @@ def _handle_resolve_source(start_response, params: dict[str, list[str]]):
     )
 
 
+def _handle_pick_alarm_slot_folder(start_response):
+    if not sys.platform.startswith("win"):
+        return _json(start_response, {"error": "unsupported_platform", "detail": "Native folder picker is currently Windows-only."}, "400 Bad Request")
+    script = r'''
+Add-Type -AssemblyName System.Windows.Forms
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+$dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+$dialog.Description = "Select your session-to-song alarm sync folder"
+$dialog.ShowNewFolderButton = $true
+$result = $dialog.ShowDialog()
+if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+  Write-Output $dialog.SelectedPath
+}
+'''.strip()
+    try:
+        completed = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-STA", "-Command", script],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except subprocess.TimeoutExpired:
+        return _json(start_response, {"error": "picker_timeout", "detail": "Folder picker timed out."}, "408 Request Timeout")
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "Folder picker failed.").strip()
+        return _json(start_response, {"error": "picker_failed", "detail": detail}, "500 Internal Server Error")
+    selected = completed.stdout.strip().splitlines()[-1].strip() if completed.stdout.strip() else ""
+    if not selected:
+        return _json(start_response, {"cancelled": True})
+    return _json(start_response, {"path": selected})
+
+
 def _handle_publish_alarm_slot(start_response, payload: dict):
     name = (payload.get("name") or "audio").strip()
     path = WEB_OUTPUT_DIR / "generated_audio.mp3" if name == "audio" else Path(payload.get("path") or "")
@@ -508,6 +542,9 @@ def app(environ, start_response):
             return _handle_play_audio(start_response, _read_json_body(environ))
         except Exception as exc:  # pragma: no cover - debug path
             return _json(start_response, {"error": "playback_failed", "detail": str(exc)}, "500 Internal Server Error")
+
+    if path == "/api/alarm-slot/pick-folder" and method == "POST":
+        return _handle_pick_alarm_slot_folder(start_response)
 
     if path == "/api/alarm-slot" and method == "POST":
         try:
