@@ -44,14 +44,21 @@ def default_alarm_slot_dirs() -> list[Path]:
     userprofile = Path(os.getenv("USERPROFILE", str(Path.home())))
     dirs.extend([
         userprofile / "My Drive" / "sessiontosong" / "alarms",
+        userprofile / "My Drive" / "sessiontosong alarms",
         userprofile / "Google Drive" / "My Drive" / "sessiontosong" / "alarms",
+        userprofile / "Google Drive" / "My Drive" / "sessiontosong alarms",
         userprofile / "Google Drive" / "sessiontosong" / "alarms",
+        userprofile / "Google Drive" / "sessiontosong alarms",
         userprofile / "Drive" / "sessiontosong" / "alarms",
+        userprofile / "Drive" / "sessiontosong alarms",
         userprofile / "iCloudDrive" / "sessiontosong" / "alarms",
+        userprofile / "iCloudDrive" / "sessiontosong alarms",
         userprofile / "iCloud Drive" / "sessiontosong" / "alarms",
+        userprofile / "iCloud Drive" / "sessiontosong alarms",
     ])
     for letter in "DEFGHIJKLMNOPQRSTUVWXYZ":
         dirs.append(Path(f"{letter}:\\My Drive\\sessiontosong\\alarms"))
+        dirs.append(Path(f"{letter}:\\My Drive\\sessiontosong alarms"))
     seen: set[str] = set()
     unique: list[Path] = []
     for directory in dirs:

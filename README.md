@@ -303,13 +303,13 @@ Recommended flow:
 CLI equivalent:
 
 ```bash
-session-to-song alarm-slot morning --file content/output/webui-latest/generated_audio.mp3 --target-dir "C:\Users\you\My Drive\sessiontosong\alarms"
+session-to-song alarm-slot morning --file content/output/webui-latest/generated_audio.mp3 --target-dir "G:\My Drive\sessiontosong\alarms"
 ```
 
 You can avoid passing `--target-dir` every time by setting:
 
 ```bash
-SESSION_TO_SONG_ALARM_SLOT_DIR="C:\Users\you\My Drive\sessiontosong\alarms"
+SESSION_TO_SONG_ALARM_SLOT_DIR="G:\My Drive\sessiontosong\alarms"
 ```
 
 Then:

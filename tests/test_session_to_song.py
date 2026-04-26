@@ -389,8 +389,10 @@ Need to keep validating the new flow and tightening edge cases.
         status, _, payload = self._call_wsgi("/api/alarm-slot/suggestions")
         self.assertEqual(status, "200 OK")
         labels = [item["label"] for item in payload["suggestions"]]
+        paths = [item["path"] for item in payload["suggestions"]]
         self.assertIn("Google Drive", labels)
         self.assertIn("iCloud Drive", labels)
+        self.assertTrue(any("G:\\My Drive\\sessiontosong alarms" in path for path in paths))
 
     def test_web_alarm_slot_endpoint_publishes_audio(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
