@@ -18,7 +18,7 @@ from .domain import LEGACY_MODE_TO_USE, LEGACY_STYLE_TO_GENRE, RunRequest
 from .pipeline import build_from_material
 from .pipeline.session_material import extract_material_from_session, load_recent_dream_context
 from .playback import PlaybackError, play_audio
-from .providers import detect_provider_status
+from .providers import detect_provider_status, generate_music_audio
 from .storage import write_artifacts
 from .styles import STYLE_PRESETS
 
@@ -131,6 +131,20 @@ def build_parser() -> argparse.ArgumentParser:
     slot_parser.add_argument("slot", nargs="?", default="morning", help="Slot name, e.g. morning, break, reminder")
     slot_parser.add_argument("--file", default="content/output/webui-latest/generated_audio.mp3", help="Source MP3/audio file")
     slot_parser.add_argument("--target-dir", default="", help="Folder synced to phone/Drive, e.g. My Drive/sessiontosong/alarms")
+
+    morning_parser = subparsers.add_parser("morning-alarm", help="Generate and publish the nightly S2S-morning.mp3 alarm slot")
+    morning_parser.add_argument("--config", default="", help="Optional path to user config JSON")
+    morning_parser.add_argument("--outdir", default="content/output/morning-alarm", help="Directory for generated artifacts")
+    morning_parser.add_argument("--project", default="", help="Optional project label for the morning alarm")
+    morning_parser.add_argument("--genre", choices=GENRES, default="rap")
+    morning_parser.add_argument("--duration", type=_validate_duration, default=60)
+    morning_parser.add_argument("--focus", default="wake me back into the mission: yesterday, today, and why it matters")
+    morning_parser.add_argument("--sound-reference", default="energetic wake-up rap alarm, hard drums, bright synth pulse, deep bass, motivational but not cheesy")
+    morning_parser.add_argument("--target-dir", default="", help="Folder synced to phone/Drive, e.g. G:\\My Drive\\sessiontosong alarms")
+    morning_parser.add_argument("--llm-provider", default="", help="Optional one-run text writer provider")
+    morning_parser.add_argument("--llm-model", default="", help="Optional one-run text writer model")
+    morning_parser.add_argument("--music-provider", default="", help="Optional one-run music provider")
+    morning_parser.add_argument("--music-model", default="", help="Optional one-run music model")
 
     doctor_parser = subparsers.add_parser("doctor", help="Inspect provider/env setup and show what will be used")
     doctor_parser.add_argument("--config", default="", help="Optional user config path")
@@ -358,6 +372,72 @@ def _handle_alarm_slot(args: argparse.Namespace) -> int:
     return 0
 
 
+def _handle_morning_alarm(args: argparse.Namespace) -> int:
+    user_config = load_user_config(args.config or None)
+    if args.llm_provider:
+        user_config.llm_provider = args.llm_provider
+    if args.llm_model:
+        user_config.llm_model = args.llm_model
+    if args.music_provider:
+        user_config.music_provider = args.music_provider
+    if args.music_model:
+        user_config.music_model = args.music_model
+
+    request = resolve_run_request(
+        user_config,
+        RunRequest(
+            use="alarm",
+            genre=args.genre,
+            focus=args.focus,
+            sound_reference=args.sound_reference,
+            duration_seconds=args.duration,
+            source_mode="auto",
+            lookback_hours=72,
+            project=args.project or None,
+        ),
+    )
+    source = resolve_best_session_source(
+        SourceRequest(
+            mode="auto",
+            project=request.project,
+            lookback_hours=request.lookback_hours or 72,
+            use=request.resolved_use,
+        )
+    )
+    if source is None:
+        raise SystemExit("No dated memory/wiki/dream/session source found for morning alarm.")
+    material = extract_material_from_session(source, title=source.label, use=request.resolved_use)
+    artifacts = build_from_material(material, user_config, request)
+    outdir = Path(args.outdir)
+    files = write_artifacts(outdir, artifacts)
+    generated = generate_music_audio(
+        prompt=artifacts.music_prompt,
+        out_dir=outdir,
+        duration_seconds=request.duration_seconds or user_config.duration_seconds,
+        user_config=user_config,
+        preferred_model=args.music_model or None,
+        preferred_provider=args.music_provider or None,
+    )
+    slot = publish_alarm_slot(generated.path, slot="morning", target_dir=args.target_dir or None)
+    result = {
+        "source": {
+            "mode": source.mode,
+            "label": source.label,
+            "reason": source.reason,
+            "score": source.score,
+        },
+        "artifacts": {key: str(path) for key, path in files.items()},
+        "audio": {
+            "path": str(generated.path),
+            "provider": generated.provider,
+            "model": generated.model,
+        },
+        "alarm_slot": slot.to_dict(),
+    }
+    print(json.dumps(result, indent=2))
+    return 0
+
+
 def _handle_doctor(args: argparse.Namespace) -> int:
     user_config = load_user_config(args.config or None)
     status = detect_provider_status(
@@ -442,6 +522,8 @@ def main() -> int:
         return _handle_play(args)
     if args.command == "alarm-slot":
         return _handle_alarm_slot(args)
+    if args.command == "morning-alarm":
+        return _handle_morning_alarm(args)
     if args.command == "doctor":
         return _handle_doctor(args)
     raise SystemExit(f"Unknown command: {args.command}")

@@ -389,6 +389,44 @@ Next move is making the morning alarm play through the phone slot.
         self.assertIn(("openai", "gpt-6-preview"), models)
         self.assertEqual(models[("openai", "gpt-6-preview")]["profile"], "detected")
 
+    def test_morning_alarm_cli_generates_audio_and_publishes_slot(self) -> None:
+        from session_to_song.cli import _handle_morning_alarm
+        with tempfile.TemporaryDirectory() as tmp:
+            outdir = Path(tmp) / "out"
+            target_dir = Path(tmp) / "alarms"
+            generated_audio = Path(tmp) / "generated.mp3"
+            generated_audio.write_bytes(b"audio")
+            args = argparse.Namespace(
+                config="",
+                outdir=str(outdir),
+                project="",
+                genre="rap",
+                duration=30,
+                focus="wake me back into the mission",
+                sound_reference="hard drums",
+                target_dir=str(target_dir),
+                llm_provider="",
+                llm_model="",
+                music_provider="",
+                music_model="",
+            )
+            fake_source = type("Source", (), {
+                "mode": "curated_daily_dreams",
+                "label": "memory/2026-04-25.md",
+                "reason": "dated wiki/memory plus dreams",
+                "score": 1.0,
+            })()
+            fake_generated = type("Generated", (), {
+                "path": generated_audio,
+                "provider": "google",
+                "model": "models/lyria-3-pro-preview",
+            })()
+            with patch("session_to_song.cli.resolve_best_session_source", return_value=fake_source), patch(
+                "session_to_song.cli.extract_material_from_session", return_value=load_text_file_material(Path(__file__).resolve().parents[1] / "content" / "input" / "sample_day.txt")
+            ), patch("session_to_song.cli.generate_music_audio", return_value=fake_generated):
+                self.assertEqual(_handle_morning_alarm(args), 0)
+            self.assertEqual((target_dir / "S2S-morning.mp3").read_bytes(), b"audio")
+
     def test_alarm_slot_publishes_stable_morning_filename(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "generated_audio.mp3"
