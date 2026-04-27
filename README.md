@@ -152,6 +152,18 @@ It includes:
 
 ## Install
 
+### No-terminal Windows install
+
+If you do not use Bash, PowerShell, or Python commands, use the double-click Windows setup:
+
+1. Install Python 3 from <https://www.python.org/downloads/> and check **Add python.exe to PATH**.
+2. Download this repo as a ZIP from GitHub and unzip it.
+3. Open `scripts`.
+4. Double-click **Install Session to Song.bat**.
+5. Double-click **Start Session to Song.bat**.
+
+See [`docs/no-terminal-install.md`](docs/no-terminal-install.md) for the full no-terminal guide.
+
 ### Editable local install
 
 ```bash

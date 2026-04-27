@@ -331,7 +331,10 @@ def _format_provider_line(option) -> str:
 
 
 def _google_genai_installed() -> bool:
-    return importlib.util.find_spec("google.genai") is not None
+    try:
+        return importlib.util.find_spec("google.genai") is not None
+    except ModuleNotFoundError:
+        return False
 
 
 def _doctor_status_lines(status) -> list[str]:
