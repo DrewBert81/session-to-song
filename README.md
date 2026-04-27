@@ -22,6 +22,40 @@ GitHub's file viewer may not show an audio player for MP3 files. Use the direct 
 
 This is the concrete loop: ship work, turn the session into lyrics/music prompt/audio, then hear the milestone back as a short celebration.
 
+## I just want to try it
+
+If you are not a developer and do not use terminals, start here.
+
+### Windows, no typing commands
+
+1. Click the green **Code** button on GitHub.
+2. Click **Download ZIP**.
+3. Unzip the folder somewhere easy, like Desktop or Documents.
+4. Install **Python 3** from <https://www.python.org/downloads/>.
+   - During install, check **Add python.exe to PATH**.
+5. Open the unzipped `session-to-song` folder.
+6. Open the `scripts` folder.
+7. Double-click **Install Session to Song.bat**.
+8. Double-click **Start Session to Song.bat**.
+9. Your browser should open `http://127.0.0.1:8311`.
+10. Paste a session, choose a use like **celebrate** or **alarm**, then generate.
+
+What works right away:
+
+- pulse
+- lyrics
+- music prompt
+- run manifest
+
+What needs extra setup:
+
+- generated MP3 audio needs a supported music provider key and `ffmpeg`
+- phone alarm delivery needs a synced folder such as Google Drive for Desktop
+
+If something does not work, double-click **Check Session to Song.bat** and copy the message it shows.
+
+Full no-terminal guide: [`docs/no-terminal-install.md`](docs/no-terminal-install.md)
+
 ## Why music memory?
 
 OpenClaw can already preserve sessions, memories, and dreams as text. `session-to-song` adds a replay layer on top: it turns the important parts of that context into something you can hear later.
