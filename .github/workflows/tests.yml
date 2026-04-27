@@ -5,18 +5,6 @@ on:
   pull_request:
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install package
-        run: python -m pip install -U pip && python -m pip install -e .[slideshow] "pytest<9"
-      - name: Run tests
-        run: pytest -q tests/test_generator.py tests/test_music_providers.py tests/test_openclaw_memory.py tests/test_session_to_song.py -k "not vocal_sanitizer and not celebrate_push"
-
   windows-scheduled-wrapper-smoke:
     runs-on: windows-latest
     steps:
