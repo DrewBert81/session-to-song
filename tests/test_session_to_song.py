@@ -14,7 +14,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from session_to_song.adapters import load_text_file_material
+from session_to_song.adapters import load_hermes_material, load_text_file_material
 from session_to_song.alarm_slots import publish_alarm_slot, slot_filename
 from session_to_song.cli import _handle_doctor
 from session_to_song.config_loader import load_config_data, load_user_config, resolve_genre, resolve_run_request, resolve_style, save_user_config_data
@@ -94,6 +94,51 @@ Next ExampleProject step is validating the generated alarm artifact.
             self.assertIn("Next ExampleProject", material.raw_text)
             self.assertNotIn("OtherProject", material.raw_text)
             self.assertTrue(material.metadata["project_filter_matched"])
+
+    def test_hermes_adapter_extracts_sections_and_builds_artifacts(self) -> None:
+        sample_path = ROOT / "content" / "examples" / "hermes_session_sample.txt"
+        material = load_hermes_material(sample_path, project="ExampleProject")
+        self.assertEqual(material.source, "hermes")
+        self.assertIn("Hermes session", material.title)
+        self.assertIn("onboarding flow", material.raw_text)
+        self.assertTrue(material.wins)
+        self.assertTrue(material.blockers)
+        self.assertTrue(material.next_actions)
+        user_config = load_user_config()
+        user_config.llm_provider = "byok"
+        request = resolve_run_request(user_config, RunRequest(use="celebrate", genre="rock", focus="what shipped"))
+        with patch.dict(os.environ, {}, clear=True):
+            artifacts = build_from_material(material, user_config, request)
+        self.assertIn("[Celebrate Track", artifacts.lyrics)
+        self.assertIn("ExampleProject", artifacts.manifest.get("project") or "")
+        self.assertIn("celebrate track", artifacts.music_prompt)
+
+    def test_cli_generate_supports_hermes_input_source(self) -> None:
+        from session_to_song.cli import _handle_generate
+        with tempfile.TemporaryDirectory() as tmp:
+            sample_path = ROOT / "content" / "examples" / "hermes_session_sample.txt"
+            args = argparse.Namespace(
+                config="",
+                outdir=str(Path(tmp) / "out"),
+                use="celebrate",
+                genre="rock",
+                focus="what shipped",
+                delivery="save",
+                duration=30,
+                input_source="hermes",
+                source="manual",
+                session="",
+                lookback=36,
+                project="ExampleProject",
+                mode="",
+                style="",
+                question="",
+                input_file=str(sample_path),
+            )
+            with patch.dict(os.environ, {}, clear=True):
+                self.assertEqual(_handle_generate(args), 0)
+            lyrics = (Path(tmp) / "out" / "lyrics.txt").read_text(encoding="utf-8")
+            self.assertIn("[Celebrate Track", lyrics)
 
     def test_pipeline_builds_reminder_use(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -65,6 +65,18 @@ session-to-song test --use celebrate --focus "what shipped and why it matters"
 
 `doctor` now checks whether Comfy has enough workflow config to run instead of treating it as a fake-positive key-only provider.
 
+## Input adapters
+
+The tested input paths are:
+
+```bash
+session-to-song generate content/examples/example_1_input.txt --input-source text --use celebrate
+session-to-song generate content/examples/hermes_session_sample.txt --input-source hermes --use celebrate --project ExampleProject
+session-to-song generate --source auto --input-source openclaw --use reminder
+```
+
+`text` and `hermes` read a local file. `openclaw` resolves recent OpenClaw session/memory context when available.
+
 ## Fresh-clone rule of thumb
 
 - If you want the repo working immediately: ignore audio, stay text-only first.

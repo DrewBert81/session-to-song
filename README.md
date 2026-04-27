@@ -55,7 +55,7 @@ This stores the reusable context and pointers, not the audio bytes themselves. I
 
 ## What it does now
 
-- supports input adapters for:
+- supports tested input adapters for:
   - `text`
   - `openclaw`
   - `hermes`

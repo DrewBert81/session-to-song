@@ -1,0 +1,6 @@
+Hermes session export — ExampleProject
+
+ExampleProject built the lightweight onboarding flow.
+ExampleProject fixed the first-run empty state so new users see a useful next action.
+ExampleProject is blocked on final copy review and one mobile layout issue.
+Next ExampleProject step is recording a thirty-second demo and shipping the public README update.
