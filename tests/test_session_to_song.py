@@ -513,7 +513,7 @@ Next move is making the morning alarm play through the phone slot.
         with tempfile.TemporaryDirectory() as tmp:
             audio = Path(tmp) / "song.mp3"
             audio.write_bytes(b"fake mp3")
-            with patch("session_to_song.playback.os.startfile", create=True) as startfile:
+            with patch("session_to_song.playback.sys.platform", "win32"), patch("session_to_song.playback.os.startfile", create=True) as startfile:
                 result = play_audio(audio, backend="open", block=False)
             self.assertTrue(result.ok)
             self.assertEqual(result.backend, "open")
