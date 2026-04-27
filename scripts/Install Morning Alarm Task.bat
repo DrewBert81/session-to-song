@@ -6,7 +6,7 @@ set "DEFAULT_TARGET=%USERPROFILE%\My Drive\sessiontosong\alarms"
 set /p TARGET_DIR=Alarm sync folder [%DEFAULT_TARGET%]: 
 if "%TARGET_DIR%"=="" set "TARGET_DIR=%DEFAULT_TARGET%"
 
-set "DEFAULT_TIME=03:30"
+set "DEFAULT_TIME=03:00"
 set /p RUN_TIME=Daily update time, 24-hour HH:MM [%DEFAULT_TIME%]: 
 if "%RUN_TIME%"=="" set "RUN_TIME=%DEFAULT_TIME%"
 
@@ -37,6 +37,7 @@ if errorlevel 1 goto failed
 echo.
 echo Morning alarm task installed.
 echo It will update S2S-morning.mp3 every day at %RUN_TIME%.
+echo Paths with spaces, such as Google Drive folders, are supported.
 pause
 exit /b 0
 
