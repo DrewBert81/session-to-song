@@ -501,7 +501,9 @@ Next move is making the morning alarm play through the phone slot.
 
     def test_web_alarm_slot_endpoint_publishes_audio(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            with patch("session_to_song.web_app.publish_alarm_slot") as mocked:
+            latest_audio = Path(tmp) / "generated_audio.mp3"
+            latest_audio.write_bytes(b"fake mp3")
+            with patch("session_to_song.web_app.LATEST_AUDIO_PATH", latest_audio), patch("session_to_song.web_app.publish_alarm_slot") as mocked:
                 mocked.return_value.to_dict.return_value = {"ok": True, "slot": "morning", "target_path": str(Path(tmp) / "S2S-morning.mp3")}
                 status, _, payload = self._call_wsgi("/api/alarm-slot", method="POST", body=json.dumps({"name": "audio", "slot": "morning", "target_dir": tmp}).encode("utf-8"), headers={"HTTP_X_S2S_TOKEN": web_app_module.WRITE_TOKEN})
             self.assertEqual(status, "200 OK")
@@ -518,9 +520,12 @@ Next move is making the morning alarm play through the phone slot.
             startfile.assert_called_once()
 
     def test_web_play_audio_endpoint_uses_local_playback(self) -> None:
-        with patch("session_to_song.web_app.play_audio") as mocked:
-            mocked.return_value.to_dict.return_value = {"ok": True, "backend": "powershell", "path": "audio.mp3"}
-            status, _, payload = self._call_wsgi("/api/play-audio", method="POST", body=json.dumps({"name": "audio"}).encode("utf-8"), headers={"HTTP_X_S2S_TOKEN": web_app_module.WRITE_TOKEN})
+        with tempfile.TemporaryDirectory() as tmp:
+            latest_audio = Path(tmp) / "generated_audio.mp3"
+            latest_audio.write_bytes(b"fake mp3")
+            with patch("session_to_song.web_app.LATEST_AUDIO_PATH", latest_audio), patch("session_to_song.web_app.play_audio") as mocked:
+                mocked.return_value.to_dict.return_value = {"ok": True, "backend": "powershell", "path": "audio.mp3"}
+                status, _, payload = self._call_wsgi("/api/play-audio", method="POST", body=json.dumps({"name": "audio"}).encode("utf-8"), headers={"HTTP_X_S2S_TOKEN": web_app_module.WRITE_TOKEN})
         self.assertEqual(status, "200 OK")
         self.assertEqual(payload["backend"], "powershell")
 
