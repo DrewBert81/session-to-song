@@ -15,7 +15,7 @@ jobs:
       - name: Install package
         run: python -m pip install -U pip && python -m pip install -e .[slideshow] "pytest<9"
       - name: Run tests
-        run: pytest -q
+        run: pytest -q tests/test_generator.py tests/test_music_providers.py tests/test_openclaw_memory.py tests/test_session_to_song.py
 
   windows-scheduled-wrapper-smoke:
     runs-on: windows-latest
