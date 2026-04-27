@@ -22,6 +22,19 @@ GitHub's file viewer may not show an audio player for MP3 files. Use the direct 
 
 This is the concrete loop: ship work, turn the session into lyrics/music prompt/audio, then hear the milestone back as a short celebration.
 
+## Why music memory?
+
+OpenClaw can already preserve sessions, memories, and dreams as text. `session-to-song` adds a replay layer on top: it turns the important parts of that context into something you can hear later.
+
+That matters because a song can carry more than a summary:
+
+- **memory:** what happened and what mattered
+- **mood:** how the work felt
+- **momentum:** what to do next
+- **ritual:** wake up, return from a break, or celebrate a ship
+
+The goal is not to mush all context into a song. The goal is to choose a use — `alarm`, `reminder`, `celebrate`, or `next_steps` — and make a short artifact that helps the human re-enter the work with the right energy.
+
 ## What it does now
 
 - supports input adapters for:
