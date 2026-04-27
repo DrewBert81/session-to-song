@@ -119,6 +119,7 @@ session-to-song generate content/examples/example_1_input.txt --use celebrate --
 - can generate browser-playable audio from the localhost web UI when Google/Gemini, MiniMax, or Comfy music is configured
 - can play generated MP3s on the local computer for speaker/Bluetooth output
 - can publish a stable `S2S-morning.mp3` alarm-slot file into a local Drive/sync folder for Android Clock-style alarms
+- can generate a text-only `video`/`trailer` prompt pack with storyboard, keyframe prompts, and a manual render prompt
 
 ## Supported production path
 
@@ -314,6 +315,21 @@ Project-scoped OpenClaw session run:
 session-to-song generate --source auto --use alarm --project ExampleProject --outdir content/output/exampleproject-alarm
 ```
 
+### 8) Generate a launch-trailer prompt pack
+
+The `video` and `trailer` commands are text-only. They write markdown prompts/storyboards you can manually paste into Sora, Veo, Gemini, Runway, ChatGPT, or another tool. They do **not** call paid video APIs or upload anything.
+
+```bash
+session-to-song video content/input/sample_day.txt --project ExampleProject --style launch --duration 30 --outdir content/output/exampleproject-trailer
+```
+
+Output files:
+- `trailer_prompt_pack.md`
+- `video_model_prompt.txt`
+- `run_manifest.json`
+
+Available styles: `launch`, `gritty-battle`, `founder-update`. The render provider defaults to `none`; external/manual rendering may cost money and should be privacy-reviewed first.
+
 ## How it works with someone else's OpenClaw
 
 On another machine, `session-to-song` reads that user's own local OpenClaw session registry under:
@@ -443,7 +459,10 @@ scripts/Install Morning Alarm Task.bat
 It asks for:
 
 - the synced alarm folder
-- the daily update time, such as `03:30`
+- the daily update time, such as `03:00`
+
+Google Drive paths with spaces are supported by the Windows wrapper, for example
+`G:\My Drive\Sessiontosong Alarms`.
 
 To remove it later, double-click:
 
@@ -473,13 +492,26 @@ Git itself does not have a reliable built-in post-push hook. To celebrate only a
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "scripts\push_and_celebrate.ps1" origin master
 ```
 
-The wrapper runs `git push` with the arguments you pass it. If the push succeeds, it runs:
+The wrapper runs `git push` with the arguments you pass it. If the push succeeds, it writes cheap celebration artifacts by default:
 
 ```bash
-session-to-song celebrate-push --project "session-to-song" --play --no-block
+session-to-song celebrate-push --project "session-to-song"
 ```
 
-This generates a short celebration track from recent git context and plays it locally. If the push fails, celebration is skipped.
+Audio generation is opt-in to avoid accidental music-provider spend on every push. To generate and play a celebration track, set:
+
+```powershell
+$env:SESSION_TO_SONG_CELEBRATE_AUDIO = "1"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "scripts\push_and_celebrate.ps1" origin master
+```
+
+Or call the CLI directly:
+
+```bash
+session-to-song celebrate-push --project "session-to-song" --audio --play --no-block
+```
+
+If the push fails, celebration is skipped.
 
 ## Outputs
 

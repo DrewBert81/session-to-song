@@ -17,12 +17,23 @@ if ($pushExit -ne 0) {
 }
 
 $summary = "Successful git push from $RepoRoot at $(Get-Date -Format s)."
-Write-Host "Push succeeded. Generating celebration song..."
+$celebrateArgs = @(
+    "-m", "session_to_song.cli", "celebrate-push",
+    "--project", "session-to-song",
+    "--summary", $summary
+)
 
-& python -m session_to_song.cli celebrate-push --project "session-to-song" --summary $summary --play --no-block
+if ($env:SESSION_TO_SONG_CELEBRATE_AUDIO -eq "1") {
+    Write-Host "Push succeeded. Generating and playing celebration audio..."
+    $celebrateArgs += @("--audio", "--play", "--no-block")
+} else {
+    Write-Host "Push succeeded. Writing celebration artifacts only (set SESSION_TO_SONG_CELEBRATE_AUDIO=1 for audio)."
+}
+
+& python @celebrateArgs
 $celebrateExit = $LASTEXITCODE
 if ($celebrateExit -ne 0) {
-    Write-Error "Push succeeded, but celebration failed with exit code $celebrateExit."
+    Write-Error "Push succeeded, but celebration artifact generation failed with exit code $celebrateExit."
     exit $celebrateExit
 }
 

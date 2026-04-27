@@ -19,6 +19,7 @@ from .config_loader import (
 )
 from .domain import LEGACY_MODE_TO_USE, LEGACY_STYLE_TO_GENRE, RunRequest, SessionMaterial
 from .pipeline import build_from_material
+from .pipeline.orchestrator import sanitize_lyrics_for_vocals
 from .pipeline.session_material import extract_material_from_session, load_recent_dream_context
 from .openclaw_memory import export_artifacts_to_openclaw_memory
 from .playback import PlaybackError, play_audio
@@ -26,6 +27,7 @@ from .providers import detect_provider_status, generate_music_audio
 from .providers.audio_utils import ffmpeg_available
 from .storage import write_artifacts
 from .styles import STYLE_PRESETS
+from .video import RENDER_PROVIDERS, VIDEO_STYLES, build_video_prompt_pack, write_video_artifacts
 
 USES = ["alarm", "reminder", "celebrate", "next_steps"]
 GENRES = ["rap", "country", "heavy_metal", "pop", "rock", "alternative", "folk"]
@@ -84,6 +86,24 @@ def _add_generate_fields(parser: argparse.ArgumentParser, *, include_input_file:
     parser.add_argument("--openclaw-memory", action="store_true", help="Append generated artifacts to OpenClaw daily memory for this run")
 
 
+def _add_video_fields(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("input_file", nargs="?", default="content/input/sample_day.txt", help="Path to input text/session export")
+    parser.add_argument("--outdir", default="content/output/trailer", help="Directory for generated video prompt-pack artifacts")
+    parser.add_argument("--input-source", choices=INPUT_SOURCES, default="text")
+    parser.add_argument("--source", choices=SOURCE_MODES, default="manual", help="Where to pull source material from")
+    parser.add_argument("--session", default="", help="Optional explicit session key for session-based source modes")
+    parser.add_argument("--lookback", type=int, default=36, help="Lookback window for auto session sourcing")
+    parser.add_argument("--project", default="", help="Optional public-safe project label")
+    parser.add_argument("--style", choices=VIDEO_STYLES, default="launch", help="Trailer creative style")
+    parser.add_argument("--duration", type=_validate_duration, default=30, help="Target trailer duration in seconds")
+    parser.add_argument(
+        "--render-provider",
+        choices=RENDER_PROVIDERS,
+        default="none",
+        help="Rendering provider. MVP default is none: text prompt pack only; manual external renders may cost money.",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Turn sessions into use-driven lyrics, music prompts, and short replayable artifacts.")
     subparsers = parser.add_subparsers(dest="command")
@@ -126,6 +146,12 @@ def build_parser() -> argparse.ArgumentParser:
     generate_parser = subparsers.add_parser("generate", help="Generate artifacts from an input file")
     _add_generate_fields(generate_parser, include_input_file=True)
 
+    trailer_parser = subparsers.add_parser("trailer", help="Generate a text-only launch-trailer prompt pack/storyboard")
+    _add_video_fields(trailer_parser)
+
+    video_parser = subparsers.add_parser("video", help="Alias for trailer: generate a text-only video prompt pack/storyboard")
+    _add_video_fields(video_parser)
+
     play_parser = subparsers.add_parser("play", help="Play a generated MP3 on this computer")
     play_parser.add_argument("file", nargs="?", default="content/output/webui-latest/generated_audio.mp3", help="MP3/audio file to play")
     play_parser.add_argument("--backend", choices=["auto", "powershell", "ffplay", "vlc", "open"], default="auto")
@@ -161,7 +187,8 @@ def build_parser() -> argparse.ArgumentParser:
     celebrate_parser.add_argument("--focus", default="celebrate a successful GitHub push and the work that just shipped")
     celebrate_parser.add_argument("--sound-reference", default="short victorious celebration anthem, punchy drums, bright hook, energetic but not cheesy")
     celebrate_parser.add_argument("--summary", default="", help="Optional pushed-work summary to include in the song context")
-    celebrate_parser.add_argument("--play", action="store_true", help="Play the generated celebration audio locally")
+    celebrate_parser.add_argument("--audio", action="store_true", help="Generate celebration audio. Off by default to avoid accidental music-provider spend.")
+    celebrate_parser.add_argument("--play", action="store_true", help="Play the generated celebration audio locally; requires --audio")
     celebrate_parser.add_argument("--backend", choices=["auto", "powershell", "ffplay", "vlc", "open"], default="auto")
     celebrate_parser.add_argument("--no-block", action="store_true", help="Start playback and return immediately")
     celebrate_parser.add_argument("--llm-provider", default="", help="Optional one-run text writer provider")
@@ -321,6 +348,39 @@ def _handle_test(args: argparse.Namespace) -> int:
     return _handle_generate(generate_args)
 
 
+def _handle_video(args: argparse.Namespace) -> int:
+    source_mode = (args.source or "manual").replace("-", "_")
+    if source_mode == "manual":
+        material = _load_material(args.input_source, args.input_file, args.project or None)
+    else:
+        source = resolve_best_session_source(
+            SourceRequest(
+                mode=source_mode,
+                session_key=args.session or None,
+                project=args.project or None,
+                lookback_hours=args.lookback,
+                use="celebrate",
+            )
+        )
+        if source is None:
+            raise SystemExit("No recent session source found.")
+        material = extract_material_from_session(source, title=source.label, use="celebrate")
+
+    artifacts = build_video_prompt_pack(
+        material,
+        project=args.project or material.project,
+        style=args.style,
+        duration_seconds=args.duration,
+        render_provider=args.render_provider,
+    )
+    files = write_video_artifacts(Path(args.outdir), artifacts)
+    for _, path in files.items():
+        print(f"Wrote {path}")
+    print("Render provider: none (text-only MVP; no video API call was made).")
+    print("Manual render note: Sora/Veo/Gemini/Runway or other paid tools may cost money; review privacy before upload.")
+    return 0
+
+
 def _format_env_line(name: str, present: bool) -> str:
     return f"- {name}: {'set' if present else 'missing'}"
 
@@ -417,6 +477,20 @@ def _write_alarm_status(outdir: Path, payload: dict) -> None:
     (outdir / "last_alarm_status.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
 
+def _audio_prompt_with_mandatory_lyrics(music_prompt: str, lyrics: str) -> str:
+    prompt = (music_prompt or "").strip()
+    lyric_text = sanitize_lyrics_for_vocals(lyrics)
+    if not lyric_text:
+        return prompt
+    return (
+        f"{prompt}\n\n"
+        "MANDATORY VOCAL CONTENT: Use the following lyrics/backbone as the lead vocal content. "
+        "Do not treat them as optional inspiration. Keep the concrete session facts audible; "
+        "do not replace them with generic hype.\n\n"
+        f"{lyric_text}\n"
+    )
+
+
 def _git_context(summary: str, project: str) -> SessionMaterial:
     def run_git(args: list[str]) -> str:
         try:
@@ -494,7 +568,7 @@ def _handle_morning_alarm(args: argparse.Namespace) -> int:
         artifacts = build_from_material(material, user_config, request)
         files = write_artifacts(outdir, artifacts)
         generated = generate_music_audio(
-            prompt=artifacts.music_prompt,
+            prompt=_audio_prompt_with_mandatory_lyrics(artifacts.music_prompt, artifacts.lyrics),
             out_dir=outdir,
             duration_seconds=request.duration_seconds or user_config.duration_seconds,
             user_config=user_config,
@@ -557,14 +631,19 @@ def _handle_celebrate_push(args: argparse.Namespace) -> int:
     material = _git_context(args.summary, args.project)
     artifacts = build_from_material(material, user_config, request)
     files = write_artifacts(outdir, artifacts)
-    generated = generate_music_audio(
-        prompt=artifacts.music_prompt,
-        out_dir=outdir,
-        duration_seconds=request.duration_seconds or user_config.duration_seconds,
-        user_config=user_config,
-        preferred_model=args.music_model or None,
-        preferred_provider=args.music_provider or None,
-    )
+    if args.play and not args.audio:
+        raise SystemExit("--play requires --audio. Push celebrations are text-only by default to avoid accidental music-provider spend.")
+
+    generated = None
+    if args.audio:
+        generated = generate_music_audio(
+            prompt=_audio_prompt_with_mandatory_lyrics(artifacts.music_prompt, artifacts.lyrics),
+            out_dir=outdir,
+            duration_seconds=request.duration_seconds or user_config.duration_seconds,
+            user_config=user_config,
+            preferred_model=args.music_model or None,
+            preferred_provider=args.music_provider or None,
+        )
     memory_path = export_artifacts_to_openclaw_memory(artifacts, files, audio=generated)
     result = {
         "ok": True,
@@ -572,10 +651,11 @@ def _handle_celebrate_push(args: argparse.Namespace) -> int:
         "source": material.source,
         "artifacts": {key: str(path) for key, path in files.items()},
         "openclaw_memory": None if memory_path is None else str(memory_path),
-        "audio": {"path": str(generated.path), "provider": generated.provider, "model": generated.model},
+        "audio": None if generated is None else {"path": str(generated.path), "provider": generated.provider, "model": generated.model},
+        "audio_skipped": generated is None,
         "played": False,
     }
-    if args.play:
+    if args.play and generated is not None:
         playback = play_audio(generated.path, backend=args.backend, block=not args.no_block)
         result["played"] = True
         result["playback"] = playback.to_dict()
@@ -667,6 +747,8 @@ def main() -> int:
         return _handle_test(args)
     if args.command == "generate":
         return _handle_generate(args)
+    if args.command in {"trailer", "video"}:
+        return _handle_video(args)
     if args.command == "play":
         return _handle_play(args)
     if args.command == "alarm-slot":

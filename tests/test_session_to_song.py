@@ -24,6 +24,7 @@ from session_to_song.providers import detect_provider_status
 from session_to_song.providers.google_music import MusicGenerationError
 from session_to_song.providers.music_runtime import generate_music_audio, music_generation_available
 from session_to_song.pipeline import build_from_material
+from session_to_song.pipeline.orchestrator import sanitize_lyrics_for_vocals
 from session_to_song.pipeline.session_material import extract_material_from_session, load_recent_dream_context, load_recent_memory_context
 from session_to_song.openclaw_memory import export_artifacts_to_openclaw_memory
 from session_to_song.playback import play_audio, resolve_backend
@@ -231,6 +232,20 @@ Next move is making the morning alarm play through the phone slot.
             self.assertNotIn("sidebar.tsx", lowered)
             self.assertNotIn("release-checklist.md", lowered)
             self.assertIn("rooms", lowered)
+
+    def test_vocal_sanitizer_removes_tokens_codes_and_metadata(self) -> None:
+        lyrics = """
+[Alarm Track | genre=rap | ~60s]
+Wake back in: EhmeMVP OAuth connector, Nango flow, token refresh, GPT-5.4.
+First move: ReEmber slice #1/#2, runtime card, PID 1234 and SHA abc1234.
+[Reference Pulse]
+• token token API junk
+""".strip()
+        cleaned = sanitize_lyrics_for_vocals(lyrics).lower()
+        for banned in ["token", "oauth", "nango", "gpt", "pid", "sha", "#1", "reference pulse", "genre=rap"]:
+            self.assertNotIn(banned, cleaned)
+        self.assertIn("secure connection flow", cleaned)
+        self.assertIn("status card", cleaned)
 
     def test_genre_resolution_honors_project_then_use_then_default(self) -> None:
         user_config = load_user_config()
@@ -459,6 +474,55 @@ Next move is making the morning alarm play through the phone slot.
         self.assertIn(("openai", "gpt-6-preview"), models)
         self.assertEqual(models[("openai", "gpt-6-preview")]["profile"], "detected")
 
+    def test_celebrate_push_skips_audio_by_default(self) -> None:
+        from session_to_song.cli import _handle_celebrate_push
+        with tempfile.TemporaryDirectory() as tmp:
+            args = argparse.Namespace(
+                config="",
+                outdir=str(Path(tmp) / "out"),
+                project="session-to-song",
+                genre="rock",
+                duration=30,
+                focus="celebrate the push",
+                sound_reference="short anthem",
+                summary="Successful push",
+                audio=False,
+                play=False,
+                backend="auto",
+                no_block=True,
+                llm_provider="byok",
+                llm_model="",
+                music_provider="",
+                music_model="",
+            )
+            with patch("session_to_song.cli.generate_music_audio", side_effect=AssertionError("audio should not run")), patch("session_to_song.cli.export_artifacts_to_openclaw_memory", return_value=None):
+                self.assertEqual(_handle_celebrate_push(args), 0)
+            self.assertTrue((Path(tmp) / "out" / "lyrics.txt").exists())
+
+    def test_celebrate_push_play_requires_audio(self) -> None:
+        from session_to_song.cli import _handle_celebrate_push
+        with tempfile.TemporaryDirectory() as tmp:
+            args = argparse.Namespace(
+                config="",
+                outdir=str(Path(tmp) / "out"),
+                project="session-to-song",
+                genre="rock",
+                duration=30,
+                focus="celebrate the push",
+                sound_reference="short anthem",
+                summary="Successful push",
+                audio=False,
+                play=True,
+                backend="auto",
+                no_block=True,
+                llm_provider="byok",
+                llm_model="",
+                music_provider="",
+                music_model="",
+            )
+            with self.assertRaises(SystemExit):
+                _handle_celebrate_push(args)
+
     def test_morning_alarm_cli_generates_audio_and_publishes_slot(self) -> None:
         from session_to_song.cli import _handle_morning_alarm
         with tempfile.TemporaryDirectory() as tmp:
@@ -493,8 +557,12 @@ Next move is making the morning alarm play through the phone slot.
             })()
             with patch("session_to_song.cli.resolve_best_session_source", return_value=fake_source), patch(
                 "session_to_song.cli.extract_material_from_session", return_value=load_text_file_material(Path(__file__).resolve().parents[1] / "content" / "input" / "sample_day.txt")
-            ), patch("session_to_song.cli.generate_music_audio", return_value=fake_generated):
+            ), patch("session_to_song.cli.generate_music_audio", return_value=fake_generated) as mock_generate:
                 self.assertEqual(_handle_morning_alarm(args), 0)
+            prompt = mock_generate.call_args.kwargs["prompt"]
+            self.assertIn("MANDATORY VOCAL CONTENT", prompt)
+            self.assertIn("workflow", prompt)
+            self.assertNotIn("[Alarm Track", prompt)
             self.assertEqual((target_dir / "S2S-morning.mp3").read_bytes(), b"audio")
 
     def test_alarm_slot_publishes_stable_morning_filename(self) -> None:

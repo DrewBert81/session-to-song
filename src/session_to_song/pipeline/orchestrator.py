@@ -29,6 +29,10 @@ JARGON_PATTERNS = [
     r"\bsetup flow\b",
     r"\bllm\b",
     r"\bpython\b",
+    r"\bgpt[-\w.]*\b",
+    r"\bapi[-_\w]*\b",
+    r"\b[a-z]{2,}\d+[a-z0-9]*\b",
+    r"#\d+(?:/#?\d+)?",
 ]
 
 HUMAN_REWRITES = {
@@ -41,6 +45,28 @@ HUMAN_REWRITES = {
     "web flow": "the experience",
     "drew approved": "build mode was approved",
     "drew identified": "the product copy showed",
+    "oauth connector": "secure connection flow",
+    "oauth": "secure sign-in",
+    "token refresh": "the connection stayed alive",
+    "tokens": "access stayed protected",
+    "token": "secure access",
+    "nango": "the connector layer",
+    "runtime card": "status card",
+    "runtime status": "live status",
+    "runtime": "live status",
+    "advanced settings": "control settings",
+    "server-side": "behind the scenes",
+    "api": "connection",
+    "ehmemvp": "the boardroom app",
+    "ehme mvp": "the boardroom app",
+    "ehme": "the boardroom app",
+    "reember-front": "the front end",
+    "reember front": "the front end",
+    "reember": "the app",
+    "slice #1": "the first working piece",
+    "slice #2": "the second working piece",
+    "slice one": "the first working piece",
+    "slice two": "the second working piece",
 }
 
 USE_HELPERS = {
@@ -109,10 +135,42 @@ def _humanize_line(line: str) -> str:
     cleaned = _strip_commit_noise(cleaned)
     for pattern in JARGON_PATTERNS:
         cleaned = re.sub(pattern, "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b(?:id|pid|uuid|sha|hash|port)\s*[:#]?\s*\S*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\b(?:id|pid|uuid|sha|hash|port)\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"[/#]+", " ", cleaned)
     cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" ,.-")
     if not cleaned:
         return "we moved the work forward with real momentum"
     return cleaned
+
+
+def sanitize_lyrics_for_vocals(lyrics: str) -> str:
+    """Make generated lyrics safe for sung/rap vocals: no metadata, codes, or tech-token soup."""
+    vocal_lines: list[str] = []
+    skip_reference_pulse = False
+    for raw in (lyrics or "").splitlines():
+        line = raw.strip()
+        if not line:
+            if vocal_lines and vocal_lines[-1]:
+                vocal_lines.append("")
+            continue
+        if re.fullmatch(r"\[[^\]]+\]", line):
+            skip_reference_pulse = "reference pulse" in line.lower()
+            continue
+        if skip_reference_pulse:
+            if line.startswith("["):
+                skip_reference_pulse = False
+            else:
+                continue
+        line = line.lstrip("•- ")
+        cleaned = _humanize_line(line)
+        if re.search(r"\b(token|oauth|nango|gpt|api|uuid|sha|pid|port)\b", cleaned, flags=re.IGNORECASE):
+            cleaned = _humanize_line(cleaned)
+        if cleaned and cleaned not in vocal_lines:
+            vocal_lines.append(cleaned)
+    while vocal_lines and not vocal_lines[-1]:
+        vocal_lines.pop()
+    return "\n".join(vocal_lines) or "wake up, find the thread, and move with purpose"
 
 
 def _best_lines(material: SessionMaterial, limit: int = 4) -> list[str]:
@@ -295,7 +353,7 @@ def build_from_material(material: SessionMaterial, user_config: UserConfig, requ
                 fallback_music_prompt=music_prompt,
             )
             pulse = generated["pulse"]
-            lyrics = generated["lyrics"]
+            lyrics = sanitize_lyrics_for_vocals(generated["lyrics"])
             music_prompt = generated["music_prompt"]
             generation_mode = "llm"
         except Exception as exc:
