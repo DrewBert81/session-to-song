@@ -25,6 +25,7 @@ classifiers = [
 
 [project.optional-dependencies]
 google-audio = ["google-genai>=1.0.0"]
+slideshow = ["Pillow>=10"]
 
 [project.scripts]
 session-to-song = "session_to_song.cli:main"
