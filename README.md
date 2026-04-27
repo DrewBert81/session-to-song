@@ -428,7 +428,36 @@ On Windows, prefer the hardened wrapper because it sets the repo root, checks `f
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "scripts\run_morning_alarm.ps1"
 ```
 
-An external scheduler such as OpenClaw cron or Windows Task Scheduler can call that wrapper. For true audible local-speaker alarms, keep the computer awake and use `session-to-song play` at trigger time.
+To install the daily Windows Task Scheduler job without typing commands, double-click:
+
+```text
+scripts/Install Morning Alarm Task.bat
+```
+
+It asks for:
+
+- the synced alarm folder
+- the daily update time, such as `03:30`
+
+To remove it later, double-click:
+
+```text
+scripts/Remove Morning Alarm Task.bat
+```
+
+On macOS/Linux, use the cron helper:
+
+```bash
+sh scripts/install_morning_alarm_cron.sh "$HOME/sessiontosong/alarms" "30 3"
+```
+
+Remove it with:
+
+```bash
+sh scripts/remove_morning_alarm_cron.sh
+```
+
+For true audible local-speaker alarms, keep the computer awake and use `session-to-song play` at trigger time.
 
 ### Celebrate after a push
 

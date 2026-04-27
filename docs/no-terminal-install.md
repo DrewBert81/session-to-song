@@ -53,6 +53,45 @@ For generated MP3 audio, install `ffmpeg` and configure one of:
 
 If this sounds too technical, start without audio keys first. Generate lyrics and music prompts, then add audio later.
 
+## Optional: install the nightly morning alarm updater
+
+After the app is installed and your alarm sync folder exists, double-click:
+
+```text
+scripts/Install Morning Alarm Task.bat
+```
+
+It asks for:
+
+- your synced alarm folder, for example `C:\Users\You\My Drive\sessiontosong\alarms`
+- the daily update time, for example `03:30`
+
+This creates a Windows Task Scheduler job named:
+
+```text
+SessionToSong Morning Alarm
+```
+
+The task updates `S2S-morning.mp3` every day. Your phone alarm still needs to be set once in Android Clock to use that file.
+
+To remove the scheduled job, double-click:
+
+```text
+scripts/Remove Morning Alarm Task.bat
+```
+
 ## macOS / Linux
 
 A no-terminal app bundle is not packaged yet. For now, use the regular README install commands on macOS/Linux.
+
+For cron-based morning alarm updates:
+
+```bash
+sh scripts/install_morning_alarm_cron.sh "$HOME/sessiontosong/alarms" "30 3"
+```
+
+Remove cron updates with:
+
+```bash
+sh scripts/remove_morning_alarm_cron.sh
+```
