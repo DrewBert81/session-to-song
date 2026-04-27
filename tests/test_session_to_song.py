@@ -25,6 +25,7 @@ from session_to_song.providers.google_music import MusicGenerationError
 from session_to_song.providers.music_runtime import generate_music_audio, music_generation_available
 from session_to_song.pipeline import build_from_material
 from session_to_song.pipeline.session_material import extract_material_from_session, load_recent_dream_context, load_recent_memory_context
+from session_to_song.openclaw_memory import export_artifacts_to_openclaw_memory
 from session_to_song.playback import play_audio, resolve_backend
 from session_to_song.project_filter import filter_text_for_project
 from session_to_song.storage import write_artifacts
@@ -211,6 +212,27 @@ Next move is making the morning alarm play through the phone slot.
             self.assertEqual(manifest["genre"], "rap")
             self.assertIn("llm", manifest)
             self.assertIn("music", manifest)
+
+    def test_openclaw_memory_export_appends_artifacts_to_daily_memory(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "sample.txt"
+            path.write_text(SAMPLE, encoding="utf-8")
+            material = load_text_file_material(path)
+            user_config = load_user_config()
+            user_config.llm_provider = "byok"
+            request = resolve_run_request(user_config, RunRequest(use="celebrate", focus="what shipped"))
+            with patch.dict(os.environ, {}, clear=True):
+                artifacts = build_from_material(material, user_config, request)
+            outdir = Path(tmp) / "out"
+            files = write_artifacts(outdir, artifacts)
+            memory_file = export_artifacts_to_openclaw_memory(artifacts, files, enabled=True, workspace=Path(tmp) / "openclaw-workspace")
+            self.assertIsNotNone(memory_file)
+            assert memory_file is not None
+            content = memory_file.read_text(encoding="utf-8")
+            self.assertIn("Session-to-song artifact", content)
+            self.assertIn("### Lyrics", content)
+            self.assertIn("### Music prompt", content)
+            self.assertIn("lyrics.txt", content)
 
     def test_user_config_can_be_saved_and_reloaded(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

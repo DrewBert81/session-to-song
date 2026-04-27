@@ -19,6 +19,7 @@ from .config_loader import load_user_config, resolve_run_request
 from .domain import RunRequest
 from .pipeline import build_from_material
 from .pipeline.session_material import extract_material_from_session, load_recent_dream_context
+from .openclaw_memory import export_artifacts_to_openclaw_memory
 from .playback import PlaybackError, play_audio
 from .providers.music_common import MusicGenerationError
 from .providers import detect_provider_status, generate_music_audio, music_generation_available
@@ -319,6 +320,7 @@ def _handle_generate(start_response, payload: dict):
         )
     artifacts = build_from_material(material, user_config, request)
     files = write_artifacts(WEB_OUTPUT_DIR, artifacts)
+    memory_path = export_artifacts_to_openclaw_memory(artifacts, files)
     return _json(
         start_response,
         {
@@ -338,6 +340,7 @@ def _handle_generate(start_response, payload: dict):
                 "preview": resolved_source.preview,
             },
             "files": {key: str(path) for key, path in files.items()},
+            "openclaw_memory": None if memory_path is None else str(memory_path),
         },
     )
 

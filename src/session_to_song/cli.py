@@ -20,6 +20,7 @@ from .config_loader import (
 from .domain import LEGACY_MODE_TO_USE, LEGACY_STYLE_TO_GENRE, RunRequest, SessionMaterial
 from .pipeline import build_from_material
 from .pipeline.session_material import extract_material_from_session, load_recent_dream_context
+from .openclaw_memory import export_artifacts_to_openclaw_memory
 from .playback import PlaybackError, play_audio
 from .providers import detect_provider_status, generate_music_audio
 from .providers.audio_utils import ffmpeg_available
@@ -247,6 +248,7 @@ def _handle_generate(args: argparse.Namespace) -> int:
         material = extract_material_from_session(source, title=source.label, use=request.resolved_use)
     artifacts = build_from_material(material, user_config, request)
     files = write_artifacts(Path(args.outdir), artifacts)
+    export_artifacts_to_openclaw_memory(artifacts, files)
     return _emit_run_summary(user_config, request, files)
 
 
@@ -487,6 +489,7 @@ def _handle_morning_alarm(args: argparse.Namespace) -> int:
         material = extract_material_from_session(source, title=source.label, use=request.resolved_use)
         artifacts = build_from_material(material, user_config, request)
         files = write_artifacts(outdir, artifacts)
+        memory_path = export_artifacts_to_openclaw_memory(artifacts, files)
         generated = generate_music_audio(
             prompt=artifacts.music_prompt,
             out_dir=outdir,
@@ -509,6 +512,7 @@ def _handle_morning_alarm(args: argparse.Namespace) -> int:
             "score": source.score,
         },
         "artifacts": {key: str(path) for key, path in files.items()},
+        "openclaw_memory": None if memory_path is None else str(memory_path),
         "audio": {
             "path": str(generated.path),
             "provider": generated.provider,
@@ -549,6 +553,7 @@ def _handle_celebrate_push(args: argparse.Namespace) -> int:
     material = _git_context(args.summary, args.project)
     artifacts = build_from_material(material, user_config, request)
     files = write_artifacts(outdir, artifacts)
+    memory_path = export_artifacts_to_openclaw_memory(artifacts, files)
     generated = generate_music_audio(
         prompt=artifacts.music_prompt,
         out_dir=outdir,
@@ -562,6 +567,7 @@ def _handle_celebrate_push(args: argparse.Namespace) -> int:
         "updated_at": datetime.now().isoformat(),
         "source": material.source,
         "artifacts": {key: str(path) for key, path in files.items()},
+        "openclaw_memory": None if memory_path is None else str(memory_path),
         "audio": {"path": str(generated.path), "provider": generated.provider, "model": generated.model},
         "played": False,
     }

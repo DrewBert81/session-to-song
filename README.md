@@ -35,6 +35,24 @@ That matters because a song can carry more than a summary:
 
 The goal is not to mush all context into a song. The goal is to choose a use — `alarm`, `reminder`, `celebrate`, or `next_steps` — and make a short artifact that helps the human re-enter the work with the right energy.
 
+### Persisting songs back into OpenClaw memory
+
+Generated text artifacts are always written to the selected output folder. If you also want OpenClaw to remember the song run, enable the memory export:
+
+```bash
+SESSION_TO_SONG_OPENCLAW_MEMORY=1
+```
+
+When enabled, each generated run appends a compact record to OpenClaw's daily memory file under `memory/YYYY-MM-DD.md`, including:
+
+- pulse
+- lyrics
+- music prompt
+- manifest summary
+- local artifact paths
+
+This stores the reusable context and pointers, not the audio bytes themselves. It keeps the song connected to OpenClaw's memory/dream trail without turning the memory file into a media dump.
+
 ## What it does now
 
 - supports input adapters for:
