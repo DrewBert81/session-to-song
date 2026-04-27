@@ -85,7 +85,13 @@ When enabled, each generated run appends a compact record to OpenClaw's daily me
 - manifest summary
 - local artifact paths
 
-This stores the reusable context and pointers, not the audio bytes themselves. It keeps the song connected to OpenClaw's memory/dream trail without turning the memory file into a media dump.
+This stores the reusable context and pointers, not the audio bytes themselves. When audio is generated, the memory entry can also include the local `generated_audio.mp3` path, provider/model metadata, and any published alarm-slot path. It keeps the song connected to OpenClaw's memory/dream trail without turning the memory file into a media dump.
+
+CLI users can force memory export for a single text-artifact run without setting an environment variable:
+
+```bash
+session-to-song generate content/examples/example_1_input.txt --use celebrate --openclaw-memory
+```
 
 ## What it does now
 

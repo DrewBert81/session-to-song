@@ -19,7 +19,7 @@ from .config_loader import load_user_config, resolve_run_request
 from .domain import RunRequest
 from .pipeline import build_from_material
 from .pipeline.session_material import extract_material_from_session, load_recent_dream_context
-from .openclaw_memory import export_artifacts_to_openclaw_memory
+from .openclaw_memory import append_audio_to_openclaw_memory, export_artifacts_to_openclaw_memory
 from .playback import PlaybackError, play_audio
 from .providers.music_common import MusicGenerationError
 from .providers import detect_provider_status, generate_music_audio, music_generation_available
@@ -30,6 +30,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WEB_DIR = ROOT / "webui"
 WEB_OUTPUT_DIR = ROOT / "content" / "output" / "webui-latest"
 LATEST_AUDIO_PATH: Path | None = None
+LATEST_MEMORY_PATH: Path | None = None
 WRITE_TOKEN = secrets.token_urlsafe(24)
 
 USES = ["alarm", "reminder", "celebrate"]
@@ -321,6 +322,8 @@ def _handle_generate(start_response, payload: dict):
     artifacts = build_from_material(material, user_config, request)
     files = write_artifacts(WEB_OUTPUT_DIR, artifacts)
     memory_path = export_artifacts_to_openclaw_memory(artifacts, files)
+    global LATEST_MEMORY_PATH
+    LATEST_MEMORY_PATH = memory_path
     return _json(
         start_response,
         {
@@ -431,6 +434,7 @@ def _handle_publish_alarm_slot(start_response, payload: dict):
         )
     except AlarmSlotError as exc:
         return _json(start_response, {"error": "alarm_slot_failed", "detail": str(exc)}, "500 Internal Server Error")
+    append_audio_to_openclaw_memory(LATEST_MEMORY_PATH, alarm_slot=result)
     return _json(start_response, result.to_dict())
 
 
@@ -476,6 +480,7 @@ def _handle_generate_audio(start_response, payload: dict):
 
     global LATEST_AUDIO_PATH
     LATEST_AUDIO_PATH = generated.path
+    append_audio_to_openclaw_memory(LATEST_MEMORY_PATH, audio=generated)
 
     return _json(
         start_response,

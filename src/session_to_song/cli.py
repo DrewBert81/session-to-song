@@ -81,6 +81,7 @@ def _add_generate_fields(parser: argparse.ArgumentParser, *, include_input_file:
     parser.add_argument("--session", default="", help="Optional explicit session key for session-based source modes")
     parser.add_argument("--lookback", type=int, default=36, help="Lookback window for auto session sourcing")
     parser.add_argument("--project", default="", help="Optional project label")
+    parser.add_argument("--openclaw-memory", action="store_true", help="Append generated artifacts to OpenClaw daily memory for this run")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -248,7 +249,7 @@ def _handle_generate(args: argparse.Namespace) -> int:
         material = extract_material_from_session(source, title=source.label, use=request.resolved_use)
     artifacts = build_from_material(material, user_config, request)
     files = write_artifacts(Path(args.outdir), artifacts)
-    export_artifacts_to_openclaw_memory(artifacts, files)
+    export_artifacts_to_openclaw_memory(artifacts, files, enabled=True if getattr(args, "openclaw_memory", False) else None)
     return _emit_run_summary(user_config, request, files)
 
 
@@ -492,7 +493,6 @@ def _handle_morning_alarm(args: argparse.Namespace) -> int:
         material = extract_material_from_session(source, title=source.label, use=request.resolved_use)
         artifacts = build_from_material(material, user_config, request)
         files = write_artifacts(outdir, artifacts)
-        memory_path = export_artifacts_to_openclaw_memory(artifacts, files)
         generated = generate_music_audio(
             prompt=artifacts.music_prompt,
             out_dir=outdir,
@@ -502,6 +502,7 @@ def _handle_morning_alarm(args: argparse.Namespace) -> int:
             preferred_provider=args.music_provider or None,
         )
         slot = publish_alarm_slot(generated.path, slot="morning", target_dir=args.target_dir or None)
+        memory_path = export_artifacts_to_openclaw_memory(artifacts, files, audio=generated, alarm_slot=slot)
     except Exception as exc:
         _write_alarm_status(outdir, {"ok": False, "updated_at": datetime.now().isoformat(), "error": str(exc)})
         raise SystemExit(f"Morning alarm failed: {exc}")
@@ -556,7 +557,6 @@ def _handle_celebrate_push(args: argparse.Namespace) -> int:
     material = _git_context(args.summary, args.project)
     artifacts = build_from_material(material, user_config, request)
     files = write_artifacts(outdir, artifacts)
-    memory_path = export_artifacts_to_openclaw_memory(artifacts, files)
     generated = generate_music_audio(
         prompt=artifacts.music_prompt,
         out_dir=outdir,
@@ -565,6 +565,7 @@ def _handle_celebrate_push(args: argparse.Namespace) -> int:
         preferred_model=args.music_model or None,
         preferred_provider=args.music_provider or None,
     )
+    memory_path = export_artifacts_to_openclaw_memory(artifacts, files, audio=generated)
     result = {
         "ok": True,
         "updated_at": datetime.now().isoformat(),
