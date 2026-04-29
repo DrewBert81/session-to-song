@@ -21,6 +21,7 @@ from session_to_song.config_loader import load_config_data, load_user_config, re
 from session_to_song.connectors.openclaw_sessions import SourceRequest, fetch_session_text, resolve_best_session_source
 from session_to_song.domain import RunRequest
 from session_to_song.providers import detect_provider_status
+from session_to_song.providers.runtime import _parse_artifact_json
 from session_to_song.providers.google_music import MusicGenerationError
 from session_to_song.providers.music_runtime import generate_music_audio, music_generation_available
 from session_to_song.pipeline import build_from_material
@@ -246,6 +247,16 @@ First move: ReEmber slice #1/#2, runtime card, PID 1234 and SHA abc1234.
             self.assertNotIn(banned, cleaned)
         self.assertIn("secure connection flow", cleaned)
         self.assertIn("status card", cleaned)
+
+    def test_llm_artifact_parser_accepts_google_style_arrays_and_camel_case(self) -> None:
+        parsed = _parse_artifact_json(json.dumps({
+            "pulse": ["first signal", "second signal"],
+            "lyrics": {"intro": "wake up", "verse": "ship the useful thing"},
+            "musicPrompt": "short rap alarm with bright drums",
+        }))
+        self.assertEqual(parsed["pulse"], "first signal\nsecond signal")
+        self.assertIn("wake up", parsed["lyrics"])
+        self.assertEqual(parsed["music_prompt"], "short rap alarm with bright drums")
 
     def test_genre_resolution_honors_project_then_use_then_default(self) -> None:
         user_config = load_user_config()

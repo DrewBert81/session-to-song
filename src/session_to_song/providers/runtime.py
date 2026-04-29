@@ -31,6 +31,28 @@ def _extract_openai_content(response: dict) -> str:
         raise LLMRuntimeError(f"Bad LLM response shape: {exc}") from exc
 
 
+def _artifact_value_as_text(value: object) -> str | None:
+    if isinstance(value, str):
+        text = value.strip()
+        return text or None
+    if isinstance(value, list):
+        parts: list[str] = []
+        for item in value:
+            if isinstance(item, str):
+                text = item.strip()
+            elif isinstance(item, dict):
+                text = " ".join(str(part).strip() for part in item.values() if str(part).strip())
+            else:
+                text = str(item).strip()
+            if text:
+                parts.append(text)
+        return "\n".join(parts) if parts else None
+    if isinstance(value, dict):
+        parts = [str(item).strip() for item in value.values() if str(item).strip()]
+        return "\n".join(parts) if parts else None
+    return None
+
+
 def _parse_artifact_json(content: str) -> dict[str, str]:
     cleaned = content.strip()
     if cleaned.startswith("```"):
@@ -41,13 +63,17 @@ def _parse_artifact_json(content: str) -> dict[str, str]:
         cleaned = cleaned[cleaned.find("{") : cleaned.rfind("}") + 1]
     data = json.loads(cleaned)
     aliases = {
-        "pulse": ["pulse", "summary"],
-        "lyrics": ["lyrics", "speech", "script"],
-        "music_prompt": ["music_prompt", "prompt", "audio_prompt"],
+        "pulse": ["pulse", "summary", "daily_pulse", "brief"],
+        "lyrics": ["lyrics", "speech", "script", "spoken_word", "song_lyrics"],
+        "music_prompt": ["music_prompt", "musicPrompt", "prompt", "audio_prompt", "audioPrompt", "generation_prompt"],
     }
     normalized: dict[str, str] = {}
     for target, keys in aliases.items():
-        value = next((data.get(key) for key in keys if isinstance(data.get(key), str) and data.get(key).strip()), None)
+        value = None
+        for key in keys:
+            value = _artifact_value_as_text(data.get(key))
+            if value:
+                break
         if not value:
             raise LLMRuntimeError("LLM output missing required fields")
         normalized[target] = value.strip()
