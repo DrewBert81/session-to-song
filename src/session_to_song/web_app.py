@@ -319,7 +319,14 @@ def _handle_generate(start_response, payload: dict):
             title=(payload.get("title") or resolved_source.label or "auto-session").strip() or "auto-session",
             use=request.resolved_use,
         )
-    artifacts = build_from_material(material, user_config, request)
+    _prev_lyrics_path = WEB_OUTPUT_DIR / "lyrics.txt"
+    _previous_lyrics: str | None = None
+    if _prev_lyrics_path.exists():
+        try:
+            _previous_lyrics = _prev_lyrics_path.read_text(encoding="utf-8").strip() or None
+        except Exception:
+            pass
+    artifacts = build_from_material(material, user_config, request, previous_lyrics=_previous_lyrics)
     files = write_artifacts(WEB_OUTPUT_DIR, artifacts)
     memory_path = export_artifacts_to_openclaw_memory(artifacts, files)
     global LATEST_MEMORY_PATH

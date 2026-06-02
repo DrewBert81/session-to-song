@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
 from urllib import request as urllib_request
 
 from ..domain import RunRequest, SessionMaterial, StylePreset, UserConfig
@@ -117,7 +118,9 @@ def synthesize_artifacts_via_llm(
     fallback_pulse: str,
     fallback_lyrics: str,
     fallback_music_prompt: str,
+    previous_lyrics: str | None = None,
 ) -> dict[str, str]:
+    run_variation_seed = secrets.token_hex(4)
     focus = (request.resolved_focus or "").strip()
     sound_reference = (request.sound_reference or "").strip()
     artifact_use = request.resolved_use
@@ -153,6 +156,7 @@ Return ONLY valid JSON with this exact shape:
 }}
 
 Rules:
+- Run variation seed: {run_variation_seed} — use this as creative entropy to ensure output is fresh and distinct from any previous run.
 - Make the output materially reflect the user's focus.
 - Treat Sound reference as sound design only; do not make it the lyrical subject.
 - Do not just restate the same template with swapped nouns.
@@ -162,7 +166,7 @@ Rules:
 - Use decides content. Genre decides sound.
 - If the focus is strategic/business-oriented, answer that focus inside the artifact instead of forcing a generic recap.
 - For alarm: this is mission re-entry after sleep. It must orient the listener into today, not simply celebrate what shipped.
-- For alarm: use yesterday as context, then point at today’s first move and why getting up matters.
+- For alarm: use yesterday as context, then point at today's first move and why getting up matters.
 - For alarm: avoid phrases like "what shipped and why it matters" unless the source itself says that.
 - For reminder: this is a status/reminder artifact. It should preserve state, unresolved tension, decisions, and what must not be forgotten. It should not sound like a victory lap.
 - For celebrate: this is payoff. Make completed work feel earned, replayable, and specific.
@@ -221,6 +225,9 @@ Next actions: {json.dumps(material.next_actions)}
 Decisions: {json.dumps(material.metadata.get("decisions", []))}
 Raw text (truncated for cost/context limits):
 {material.raw_text[-20000:] if len(material.raw_text) > 20000 else material.raw_text}
+
+Previous run lyrics to AVOID repeating (write something meaningfully different):
+{previous_lyrics[:600] if previous_lyrics else '(none)'}
 
 Fallback reference only for rough factual orientation. Do not mimic its wording or structure:
 PULSE:

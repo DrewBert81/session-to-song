@@ -274,7 +274,14 @@ def _handle_generate(args: argparse.Namespace) -> int:
         if source is None:
             raise SystemExit("No recent session source found.")
         material = extract_material_from_session(source, title=source.label, use=request.resolved_use)
-    artifacts = build_from_material(material, user_config, request)
+    _prev_path = Path(args.outdir) / "lyrics.txt"
+    previous_lyrics: str | None = None
+    if _prev_path.exists():
+        try:
+            previous_lyrics = _prev_path.read_text(encoding="utf-8").strip() or None
+        except Exception:
+            pass
+    artifacts = build_from_material(material, user_config, request, previous_lyrics=previous_lyrics)
     files = write_artifacts(Path(args.outdir), artifacts)
     export_artifacts_to_openclaw_memory(artifacts, files, enabled=True if getattr(args, "openclaw_memory", False) else None)
     return _emit_run_summary(user_config, request, files)
@@ -565,7 +572,14 @@ def _handle_morning_alarm(args: argparse.Namespace) -> int:
         if source is None:
             raise RuntimeError("No dated memory/wiki/dream/session source found for morning alarm.")
         material = extract_material_from_session(source, title=source.label, use=request.resolved_use)
-        artifacts = build_from_material(material, user_config, request)
+        _prev_path = outdir / "lyrics.txt"
+        _previous_lyrics: str | None = None
+        if _prev_path.exists():
+            try:
+                _previous_lyrics = _prev_path.read_text(encoding="utf-8").strip() or None
+            except Exception:
+                pass
+        artifacts = build_from_material(material, user_config, request, previous_lyrics=_previous_lyrics)
         files = write_artifacts(outdir, artifacts)
         generated = generate_music_audio(
             prompt=_audio_prompt_with_mandatory_lyrics(artifacts.music_prompt, artifacts.lyrics),
@@ -629,7 +643,14 @@ def _handle_celebrate_push(args: argparse.Namespace) -> int:
     )
     outdir = Path(args.outdir)
     material = _git_context(args.summary, args.project)
-    artifacts = build_from_material(material, user_config, request)
+    _prev_path = outdir / "lyrics.txt"
+    _previous_lyrics: str | None = None
+    if _prev_path.exists():
+        try:
+            _previous_lyrics = _prev_path.read_text(encoding="utf-8").strip() or None
+        except Exception:
+            pass
+    artifacts = build_from_material(material, user_config, request, previous_lyrics=_previous_lyrics)
     files = write_artifacts(outdir, artifacts)
     if args.play and not args.audio:
         raise SystemExit("--play requires --audio. Push celebrations are text-only by default to avoid accidental music-provider spend.")

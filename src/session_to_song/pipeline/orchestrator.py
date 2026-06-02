@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import secrets
 
 from ..domain import RunRequest, SessionMaterial, SongArtifacts, StylePreset, UserConfig
 from ..styles import get_style_preset
@@ -96,6 +97,57 @@ USE_HELPERS = {
     },
 }
 
+# Variant fallback phrases used by the template path when source facts are empty.
+# Each list has four options so consecutive runs with no new session content still
+# produce noticeably different lyrics.
+_VERSE_FALLBACKS_A = [
+    "we moved the work forward fast and clean",
+    "the signal came through and the output landed",
+    "effort stacked and the project took its shape",
+    "the work held up and the record is real",
+]
+_VERSE_FALLBACKS_B = [
+    "pressure showed up but direction stayed clear",
+    "obstacles came and the thread held steady",
+    "the noise faded and the purpose came through",
+    "friction burned off and the path stayed lit",
+]
+_VERSE_FALLBACKS_C = [
+    "next move is the highest leverage one",
+    "the next step is already in reach",
+    "what happens next is the only move that counts",
+    "one more push and the gap closes fast",
+]
+_ALARM_FALLBACKS_A = [
+    "Wake back in, find the thread, choose the first move",
+    "Eyes open, orient fast, yesterday hands you the map",
+    "Back in the mission, thread intact, first move is clear",
+    "Wake up sharp, the context is loaded, start with one step",
+]
+_REMINDER_FALLBACKS_A = [
+    "State check, hold the map, don't lose the thread",
+    "Status is alive, tension is real, keep the line clear",
+    "Map is steady, decision is waiting, stay on it",
+    "Thread is live, state is known, don't let it slip",
+]
+_NEXT_STEPS_FALLBACKS_A = [
+    "Move now, pick the lever, make the next cut",
+    "Pick the move, close the gap, keep the pressure on",
+    "The next action is the only thing that counts now",
+    "One move, one moment, let the work speak forward",
+]
+_HUMANIZE_FALLBACKS = [
+    "we moved the work forward with real momentum",
+    "the work landed and the progress is real",
+    "the thread held and the output is solid",
+    "forward motion held and the result is clear",
+]
+
+
+def _variation_index() -> int:
+    """Return a random index 0-3 for selecting among fallback phrase variants."""
+    return secrets.randbelow(len(_VERSE_FALLBACKS_A))
+
 
 def _top_keywords(text: str, limit: int = 6) -> list[str]:
     counts: dict[str, int] = {}
@@ -140,7 +192,7 @@ def _humanize_line(line: str) -> str:
     cleaned = re.sub(r"[/#]+", " ", cleaned)
     cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" ,.-")
     if not cleaned:
-        return "we moved the work forward with real momentum"
+        return _HUMANIZE_FALLBACKS[_variation_index()]
     return cleaned
 
 
@@ -251,21 +303,22 @@ def build_lyrics(material: SessionMaterial, pulse: str, request: RunRequest, sty
     keywords = _top_keywords(keyword_source)
     focus_line = _focus_line(focus)
     best = _best_lines(material)
-    verse_a = _compress(best[0] if len(best) > 0 else "we moved the work forward fast and clean", 12)
-    verse_b = _compress(best[1] if len(best) > 1 else "pressure showed up but direction stayed clear", 12)
-    verse_c = _compress(best[2] if len(best) > 2 else "next move is the highest leverage one", 12)
+    _v = _variation_index()
+    verse_a = _compress(best[0] if len(best) > 0 else _VERSE_FALLBACKS_A[_v], 12)
+    verse_b = _compress(best[1] if len(best) > 1 else _VERSE_FALLBACKS_B[_v], 12)
+    verse_c = _compress(best[2] if len(best) > 2 else _VERSE_FALLBACKS_C[_v], 12)
     bridge = USE_HELPERS.get(use, USE_HELPERS["alarm"])["bridge"]
 
     if use == "alarm":
-        verse_a = f"Wake back in: {_compress(_humanize_line(material.wins[0]), 12)}" if material.wins else "Wake back in, find the thread, choose the first move"
+        verse_a = f"Wake back in: {_compress(_humanize_line(material.wins[0]), 12)}" if material.wins else _ALARM_FALLBACKS_A[_v]
         verse_b = f"First move: {_compress(_humanize_line(material.next_actions[0]), 12)}" if material.next_actions else verse_b
     elif use == "reminder":
-        verse_a = f"State check: {_compress(_humanize_line(material.wins[0]), 12)}" if material.wins else "State check, hold the map, don't lose the thread"
+        verse_a = f"State check: {_compress(_humanize_line(material.wins[0]), 12)}" if material.wins else _REMINDER_FALLBACKS_A[_v]
         verse_b = f"Remember: {_compress(_humanize_line((material.blockers or material.next_actions or ['keep the next decision visible'])[0]), 12)}"
     elif use == "celebrate" and material.wins:
         verse_a = f"Win replay: {_compress(_humanize_line(material.wins[0]), 12)}"
     elif use == "next_steps":
-        verse_a = f"Move now: {_compress(_humanize_line(material.next_actions[0]), 12)}" if material.next_actions else "Move now, pick the lever, make the next cut"
+        verse_a = f"Move now: {_compress(_humanize_line(material.next_actions[0]), 12)}" if material.next_actions else _NEXT_STEPS_FALLBACKS_A[_v]
 
     duration_seconds = request.duration_seconds or 45
     intro_line = USE_HELPERS.get(use, USE_HELPERS["alarm"])["fallback_intro"]
@@ -328,7 +381,7 @@ def build_music_prompt(material: SessionMaterial, lyrics: str, request: RunReque
     )
 
 
-def build_from_material(material: SessionMaterial, user_config: UserConfig, request: RunRequest) -> SongArtifacts:
+def build_from_material(material: SessionMaterial, user_config: UserConfig, request: RunRequest, previous_lyrics: str | None = None) -> SongArtifacts:
     style = get_style_preset(request.genre or user_config.default_genre)
     pulse = summarize_material(material, use=request.resolved_use, focus=request.resolved_focus)
     lyrics = build_lyrics(material, pulse, request, style)
@@ -351,6 +404,7 @@ def build_from_material(material: SessionMaterial, user_config: UserConfig, requ
                 fallback_pulse=pulse,
                 fallback_lyrics=lyrics,
                 fallback_music_prompt=music_prompt,
+                previous_lyrics=previous_lyrics,
             )
             pulse = generated["pulse"]
             lyrics = sanitize_lyrics_for_vocals(generated["lyrics"])
